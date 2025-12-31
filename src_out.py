@@ -53,9 +53,8 @@ def generate_prompt_file(src_dir, output_file):
                 content = read_file_content(file_path)
                 
                 # 写入到输出文件
-                f.write("\n")
-                f.write(f"{full_relative_path}\n")
-                f.write("```js\n")
+                # f.write(f"{full_relative_path}\n")
+                f.write("```\n")
                 f.write(content)
                 if content and not content.endswith('\n'):
                     f.write("\n")
