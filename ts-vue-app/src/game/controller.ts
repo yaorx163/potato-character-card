@@ -6,304 +6,32 @@
 import {
     冠军实体,
     可袭击地点实体,
-    喽啰池,
+    喽啰池实体,
     实体基类,
     母畜实体,
     领主实体,
 } from '../core/entities';
 
+
+import type { 母畜初始数据 } from '../core/entities';
+
 import { 工厂管理器 } from '../core/factories';
 
-import { 系统管理器 } from '../core/managers';
-import type { 游戏总控接口 } from '../core/managers';
+
+import type { 游戏总控接口 } from '../types/systems';
 
 
-import { 战斗管理器 } from '../core/combat';
-import type { 喽啰池管理接口 } from '../core/combat';
+import type { 喽啰池管理接口 } from '../types/managers';
+import type { 实体类型, 武装等级, 资源状态, 奴隶刷新配置 } from '@/types';
+
+import { 任务管理器, 法术管理器, 黑市管理器, 回合管理器, 喽啰管理器, 战斗管理器, 资源管理器, 实体管理器} from '../core/managers'
+
+
 
 // ═══════════════════════════════════════════════════════════════
 // 类型定义
 // ═══════════════════════════════════════════════════════════════
 
-type 武装等级 = '未武装' | '低级武装' | '中级武装' | '高级武装' | '精英武装';
-
-interface 资源状态 {
-    士气: number;
-    最大士气: number;
-    催淫母乳: number;
-}
-
-interface 实体统计 {
-    领主数量: number;
-    冠军数量: number;
-    母畜数量: number;
-    地点数量: number;
-    喽啰池数量: number;
-    喽啰总数: number;
-}
-
-// ═══════════════════════════════════════════════════════════════
-// 资源管理器
-// ═══════════════════════════════════════════════════════════════
-
-class 资源管理器 {
-    private 士气: number;
-    private 最大士气: number;
-    private 催淫母乳: number;
-
-    constructor(初始配置: Partial<资源状态> = {}) {
-        this.士气 = 初始配置.士气 ?? 50;
-        this.最大士气 = 初始配置.最大士气 ?? 100;
-        this.催淫母乳 = 初始配置.催淫母乳 ?? 0;
-    }
-
-    // ─── 士气操作 ───
-
-    获取士气(): number {
-        return this.士气;
-    }
-
-    获取最大士气(): number {
-        return this.最大士气;
-    }
-
-    修改士气(增量: number): number {
-        this.士气 = Math.max(0, Math.min(this.最大士气, this.士气 + 增量));
-        return this.士气;
-    }
-
-    设置士气(值: number): void {
-        this.士气 = Math.max(0, Math.min(this.最大士气, 值));
-    }
-
-    设置最大士气(值: number): void {
-        this.最大士气 = Math.max(0, 值);
-        if (this.士气 > this.最大士气) {
-            this.士气 = this.最大士气;
-        }
-    }
-
-    获取士气百分比(): number {
-        return this.最大士气 > 0 ? (this.士气 / this.最大士气) * 100 : 0;
-    }
-
-    // ─── 催淫母乳操作 ───
-
-    获取催淫母乳数量(): number {
-        return this.催淫母乳;
-    }
-
-    修改催淫母乳数量(增量: number): number {
-        this.催淫母乳 = Math.max(0, this.催淫母乳 + 增量);
-        return this.催淫母乳;
-    }
-
-    设置催淫母乳数量(值: number): void {
-        this.催淫母乳 = Math.max(0, 值);
-    }
-
-    // ─── 状态查询 ───
-
-    获取资源状态(): 资源状态 {
-        return {
-            士气: this.士气,
-            最大士气: this.最大士气,
-            催淫母乳: this.催淫母乳,
-        };
-    }
-
-    // ─── 回合结算 ───
-
-    回合结算(): void {
-        const 衰减上限 = 10;
-        const 理论衰减 = Math.floor(this.士气 / 8)
-        const 衰减 = Math.min(理论衰减, 衰减上限);
-        this.修改士气(-衰减);
-    }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// 实体管理器
-// ═══════════════════════════════════════════════════════════════
-
-class 实体管理器 {
-    private 领主实例: 领主实体 | null;
-    private 冠军表: Map<string, 冠军实体>;
-    private 母畜表: Map<string, 母畜实体>;
-    private 地点表: Map<string, 可袭击地点实体>;
-    private 喽啰池表: Map<string, 喽啰池>;
-    private 无将领喽啰池: 喽啰池;
-
-    constructor() {
-        this.领主实例 = null;
-        this.冠军表 = new Map();
-        this.母畜表 = new Map();
-        this.地点表 = new Map();
-        this.喽啰池表 = new Map();
-        this.无将领喽啰池 = new 喽啰池();
-        this.初始化无将领喽啰池();
-    }
-
-    private 初始化无将领喽啰池(): void {
-        // 注册所有武装等级
-        this.无将领喽啰池.注册武装等级('低级武装', { 战斗力: 110, 描述: '初级武装的喽啰' });
-        this.无将领喽啰池.注册武装等级('中级武装', { 战斗力: 120, 描述: '中级武装的喽啰' });
-        this.无将领喽啰池.注册武装等级('高级武装', { 战斗力: 160, 描述: '高级武装的喽啰' });
-        this.无将领喽啰池.注册武装等级('精英武装', { 战斗力: 300, 描述: '精英武装的喽啰' });
-    }
-
-    // ─── 领主管理 ───
-
-    设置领主(领主: 领主实体): void {
-        this.领主实例 = 领主;
-    }
-
-    获取领主(): 领主实体 | null {
-        return this.领主实例;
-    }
-
-    // ─── 冠军管理 ───
-
-    添加冠军(冠军: 冠军实体): void {
-        this.冠军表.set(冠军.实体ID, 冠军);
-
-        // 注册冠军的喽啰池
-        const 喽啰池实例 = 冠军.获取喽啰池();
-        if (喽啰池实例) {
-            this.喽啰池表.set(喽啰池实例.实体ID, 喽啰池实例);
-        }
-    }
-
-    移除冠军(冠军ID: string): boolean {
-        const 冠军 = this.冠军表.get(冠军ID);
-        if (!冠军) return false;
-
-        // 移除关联的喽啰池
-        const 喽啰池实例 = 冠军.获取喽啰池();
-        if (喽啰池实例) {
-            this.喽啰池表.delete(喽啰池实例.实体ID);
-        }
-
-        this.冠军表.delete(冠军ID);
-        return true;
-    }
-
-    获取冠军(冠军ID: string): 冠军实体 | null {
-        return this.冠军表.get(冠军ID) ?? null;
-    }
-
-    获取所有冠军(): 冠军实体[] {
-        return Array.from(this.冠军表.values());
-    }
-
-    // ─── 母畜管理 ───
-
-    添加母畜(母畜: 母畜实体): void {
-        this.母畜表.set(母畜.实体ID, 母畜);
-    }
-
-    移除母畜(母畜ID: string): boolean {
-        return this.母畜表.delete(母畜ID);
-    }
-
-    获取母畜(母畜ID: string): 母畜实体 | null {
-        return this.母畜表.get(母畜ID) ?? null;
-    }
-
-    获取所有母畜(): 母畜实体[] {
-        return Array.from(this.母畜表.values());
-    }
-
-    // ─── 地点管理 ───
-
-    添加地点(地点: 可袭击地点实体): void {
-        this.地点表.set(地点.实体ID, 地点);
-    }
-
-    移除地点(地点ID: string): boolean {
-        return this.地点表.delete(地点ID);
-    }
-
-    获取地点(地点ID: string): 可袭击地点实体 | null {
-        return this.地点表.get(地点ID) ?? null;
-    }
-
-    获取所有地点(): 可袭击地点实体[] {
-        return Array.from(this.地点表.values());
-    }
-
-    // ─── 喽啰池管理 ───
-
-    获取无将领喽啰池(): 喽啰池 {
-        return this.无将领喽啰池;
-    }
-
-    获取所有将领喽啰池(): Map<string, 喽啰池> {
-        const 将领池表 = new Map<string, 喽啰池>();
-        for (const [id, 池] of this.喽啰池表) {
-            if (池.获取将领() !== null) {
-                将领池表.set(id, 池);
-            }
-        }
-        return 将领池表;
-    }
-
-    获取喽啰总数(): number {
-        let 总数 = this.无将领喽啰池.获取总数量();
-        for (const 池 of this.喽啰池表.values()) {
-            总数 += 池.获取总数量();
-        }
-        return 总数;
-    }
-
-    // ─── 通用实体查询 ───
-
-    获取实体(实体ID: string): 实体基类 | null {
-        // 检查领主
-        if (this.领主实例?.实体ID === 实体ID) {
-            return this.领主实例;
-        }
-
-        // 检查冠军
-        if (this.冠军表.has(实体ID)) {
-            return this.冠军表.get(实体ID)!;
-        }
-
-        // 检查母畜
-        if (this.母畜表.has(实体ID)) {
-            return this.母畜表.get(实体ID)!;
-        }
-
-        // 检查地点
-        if (this.地点表.has(实体ID)) {
-            return this.地点表.get(实体ID)!;
-        }
-
-        // 检查喽啰池
-        if (this.喽啰池表.has(实体ID)) {
-            return this.喽啰池表.get(实体ID)!;
-        }
-
-        if (this.无将领喽啰池.实体ID === 实体ID) {
-            return this.无将领喽啰池;
-        }
-
-        return null;
-    }
-
-    // ─── 统计 ───
-
-    获取实体统计(): 实体统计 {
-        return {
-            领主数量: this.领主实例 ? 1 : 0,
-            冠军数量: this.冠军表.size,
-            母畜数量: this.母畜表.size,
-            地点数量: this.地点表.size,
-            喽啰池数量: this.喽啰池表.size + 1, // +1 for 无将领池
-            喽啰总数: this.获取喽啰总数(),
-        };
-    }
-}
 
 // ═══════════════════════════════════════════════════════════════
 // 游戏总控
@@ -313,8 +41,11 @@ class 游戏总控 implements 游戏总控接口 {
     private 资源管理器实例: 资源管理器;
     private 实体管理器实例: 实体管理器;
     private 工厂管理器实例: 工厂管理器;
-    private 系统管理器实例: 系统管理器;
     private 战斗管理器实例: 战斗管理器;
+    private 任务管理器实例: 任务管理器;
+    private 法术管理器实例: 法术管理器;
+    private 黑市管理器实例: 黑市管理器;
+    private 回合管理器实例: 回合管理器;
 
     // 接口实现对象
     readonly 地点管理: {
@@ -323,7 +54,7 @@ class 游戏总控 implements 游戏总控接口 {
 
     readonly 母畜管理: {
         从劝诱获取母畜: (母畜: 母畜实体) => void;
-        移除母畜: (母畜ID: string) => void;
+        移除母畜: (母畜: 母畜实体) => void;
     };
 
     readonly 冠军管理: {
@@ -332,7 +63,7 @@ class 游戏总控 implements 游戏总控接口 {
 
     readonly 喽啰池管理: {
         获取喽啰总数: () => number;
-        获取无将领喽啰池: () => 喽啰池;
+        获取无将领喽啰池: () => 喽啰池实体;
         武装升级: (数量: number, 武装等级: 武装等级) => boolean;
     };
 
@@ -344,20 +75,22 @@ class 游戏总控 implements 游戏总控接口 {
     };
 
     readonly 实体管理: {
-        获取实体: (实体ID: string) => 实体基类 | null;
+        获取实体: (实体ID: string) => 实体类型 | null;
     };
 
     constructor(配置: {
         工厂管理器: 工厂管理器;
         初始资源?: Partial<资源状态>;
     }) {
+        this.工厂管理器实例 = 配置.工厂管理器;
         this.资源管理器实例 = new 资源管理器(配置.初始资源);
         this.实体管理器实例 = new 实体管理器();
-        this.工厂管理器实例 = 配置.工厂管理器;
-        this.系统管理器实例 = new 系统管理器();
+        this.任务管理器实例 = new 任务管理器();
+        this.法术管理器实例 = new 法术管理器();
+        this.黑市管理器实例 = new 黑市管理器();
+        this.回合管理器实例 = new 回合管理器();
 
-        // 初始化系统管理器
-        this.系统管理器实例.初始化(this, this.工厂管理器实例);
+
 
         // 创建喽啰池管理接口适配器
         const 喽啰池管理适配器: 喽啰池管理接口 = {
@@ -367,11 +100,15 @@ class 游戏总控 implements 游戏总控接口 {
 
         // 创建战斗管理器
         this.战斗管理器实例 = new 战斗管理器({
-            任务管理器: this.系统管理器实例.任务管理器,
+            任务管理器: this.任务管理器实例,
             喽啰池管理: 喽啰池管理适配器,
             获取将领: (将领ID: string) => this.实体管理器实例.获取冠军(将领ID),
             获取地点: (地点ID: string) => this.实体管理器实例.获取地点(地点ID),
         });
+
+
+        // 初始化系统管理器
+        // this.系统管理器实例.初始化(this, this.工厂管理器实例);
 
         // ─── 绑定接口实现 ───
 
@@ -381,11 +118,11 @@ class 游戏总控 implements 游戏总控接口 {
 
         this.母畜管理 = {
             从劝诱获取母畜: (母畜: 母畜实体) => {
-                母畜.设置属性('来源', '劝诱获取');
+                母畜.设置属性('来源', '劝诱');
                 this.实体管理器实例.添加母畜(母畜);
             },
-            移除母畜: (母畜ID: string) => {
-                this.实体管理器实例.移除母畜(母畜ID);
+            移除母畜: (母畜: 母畜实体) => {
+                this.实体管理器实例.移除母畜(母畜);
             },
         };
 
@@ -413,6 +150,20 @@ class 游戏总控 implements 游戏总控接口 {
         this.实体管理 = {
             获取实体: (实体ID: string) => this.实体管理器实例.获取实体(实体ID),
         };
+    }
+
+    初始化(工厂管理器: 工厂管理器): void {
+        this.任务管理器实例.设置游戏总控(this);
+        this.法术管理器实例.设置游戏总控(this);
+        this.黑市管理器实例.设置游戏总控(this);
+        this.黑市管理器实例.设置工厂管理器(工厂管理器);
+        this.回合管理器实例.初始化(this.任务管理器实例, this.法术管理器实例, this.黑市管理器实例, this.战斗管理器实例, this.资源管理器实例);
+      }
+    设置奴隶刷新配置(配置: 奴隶刷新配置): void {
+    this.黑市管理器实例.设置奴隶刷新配置(配置);
+    }
+    设置喽啰池武装等级配置(配置: 奴隶刷新配置): void {
+    this.黑市管理器实例.设置奴隶刷新配置(配置);
     }
 
     // ─── 武装升级逻辑 ───
@@ -477,9 +228,7 @@ class 游戏总控 implements 游戏总控接口 {
         return this.工厂管理器实例;
     }
 
-    获取系统管理器(): 系统管理器 {
-        return this.系统管理器实例;
-    }
+
 
     获取战斗管理器(): 战斗管理器 {
         return this.战斗管理器实例;
@@ -488,19 +237,19 @@ class 游戏总控 implements 游戏总控接口 {
     // ─── 便捷方法 ───
 
     获取任务管理器() {
-        return this.系统管理器实例.任务管理器;
+        return this.任务管理器实例;
     }
 
     获取法术管理器() {
-        return this.系统管理器实例.法术管理器;
+        return this.法术管理器实例;
     }
 
     获取黑市管理器() {
-        return this.系统管理器实例.黑市管理器;
+        return this.黑市管理器实例;
     }
 
     获取回合管理器() {
-        return this.系统管理器实例.回合管理器;
+        return this.回合管理器实例;
     }
 
     // ─── 实体快捷操作 ───
@@ -548,7 +297,7 @@ class 游戏总控 implements 游戏总控接口 {
         this.资源管理器实例.回合结算();
 
         // 系统结算
-        return this.系统管理器实例.回合管理器.结束回合();
+        return this.回合管理器实例.结束回合();
     }
 
     // ─── 战斗流程 ───
@@ -572,7 +321,7 @@ class 游戏总控 implements 游戏总控接口 {
 
     获取游戏状态() {
         return {
-            回合数: this.系统管理器实例.回合管理器.获取当前回合(),
+            回合数: this.回合管理器实例.获取当前回合(),
             资源状态: this.资源管理器实例.获取资源状态(),
             实体统计: this.实体管理器实例.获取实体统计(),
             领主魔力: this.实体管理器实例.获取领主()?.获取属性('魔力') ?? 0,
@@ -634,6 +383,5 @@ export {
 
 export type {
     资源状态,
-    实体统计,
     游戏初始化配置,
 };

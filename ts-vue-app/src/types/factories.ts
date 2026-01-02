@@ -7,10 +7,10 @@ import { 冠军实体, 可袭击地点实体, 母畜实体, 领主实体 } from 
 import type { 姓名池配置, 属性系数, 数值范围 } from './common';
 
 // ─── 生育效率表 ───
-export interface 生育效率表 {
-    身份系数表: Map<string, 属性系数>;
-    种族系数表: Map<string, 属性系数>;
-}
+// export interface 生育效率表 {
+//     身份系数表: Map<string, 属性系数>;
+//     种族系数表: Map<string, 属性系数>;
+// }
 
 // ─── 冠军工厂 ───
 export interface 冠军工厂配置 {
@@ -19,22 +19,13 @@ export interface 冠军工厂配置 {
     属性随机浮动范围: number;
     前缀概率: number;
     后缀概率: number;
-    生育效率表: 生育效率表;
+    母畜种族配置: Map<string, 种族配置数据>;
+    母畜身份配置: Map<string, 身份配置数据>;
 }
 
 export interface 生育选项 {
     姓名?: string;
     性别?: string;
-}
-
-export interface 生育结果 {
-    成功: boolean;
-    冠军?: 冠军实体;
-    消耗雌性价值?: number;
-    属性?: { 力量: number; 敏捷: number; 智力: number };
-    原因?: string;
-    当前?: number;
-    需要?: number;
 }
 
 export interface 属性预估范围 {
@@ -51,14 +42,20 @@ export interface 生育属性预估 {
 
 // ─── 母畜工厂 ───
 export interface 种族配置数据 {
-    姓名池?: 姓名池配置;
-    前缀概率?: number;
-    后缀概率?: number;
+    姓名池: 姓名池配置;
+    前缀概率: number;
+    后缀概率: number;
+    生育系数: 属性系数;
+    生育力基础值: number;
+    魅力系数: number;
 }
 
 export interface 身份配置数据 {
-    最小年龄?: number;
-    最大年龄?: number;
+    最小年龄: number;
+    最大年龄: number;
+    生育系数: 属性系数;
+    生育力系数: number;
+    魅力基础值: number;
 }
 
 export interface 母畜工厂配置 {
@@ -73,9 +70,10 @@ export interface 母畜创建配置 {
     年龄?: number;
     来源?: string;
     描述?: string;
+    魅力?: number;
     来源地点ID?: string;
-    总雌性价值?: number;
-    剩余雌性价值?: number;
+    总生育力?: number;
+    剩余生育力?: number;
     捕获回合?: number;
 }
 

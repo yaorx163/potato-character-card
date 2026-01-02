@@ -1,10 +1,6 @@
 // ═══════════════════════════════════════════════════════════════
-// core/types/index.ts
-// 类型统一导出
+// data/trait.ts
+// 母畜特性标签类
 // ═══════════════════════════════════════════════════════════════
 
-export * from './common';
-export * from './entities';
-export * from './factories';
-export * from './systems';
-export * from './managers';
+

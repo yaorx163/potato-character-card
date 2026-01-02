@@ -4,13 +4,14 @@
 // ═══════════════════════════════════════════════════════════════
 
 import type { 武装等级 } from './common';
-import type { 母畜实体, 冠军实体, 可袭击地点实体, 领主实体, 喽啰池 } from '../core/entities';
+import type { 母畜实体, 冠军实体, 可袭击地点实体, 领主实体, 喽啰池实体 } from '../core/entities';
+import type { 战斗结果 } from './managers';
 
 // ─── 通用实体引用类型 ───
 // 使用字符串字面量避免循环引用，运行时由具体模块处理
-export type 可执行实体类型 = '冠军' | '母畜';
-export type 可目标实体类型 = '母畜' | '可袭击地点' | '喽啰池' | null;
-export type 实体类型 = 冠军实体 | 母畜实体 | 可袭击地点实体 | 领主实体 | 喽啰池;
+export type 可执行实体 = 冠军实体 | 母畜实体;
+export type 可目标实体 = 母畜实体 | 可袭击地点实体 | 喽啰池实体 | null;
+export type 实体类型 = 冠军实体 | 母畜实体 | 可袭击地点实体 | 领主实体 | 喽啰池实体;
 
 // ─── 任务系统 ───
 
@@ -18,9 +19,9 @@ export interface 属性变化记录 {
     [属性名: string]: [number | string, number | string];
 }
 
-type 任务前置条件 = (执行人: 实体类型) => boolean;
-type 行动力占用计算 = (执行人: 实体类型) => number;
-type 任务执行效果 = (执行人: 实体类型, 目标: 实体类型 | null, 游戏总控?: 游戏总控接口) => 任务执行结果;
+export type 任务前置条件 = (执行人: 实体类型) => boolean;
+export type 行动力占用计算 = (执行人: 实体类型) => number;
+export type 任务执行效果 = (执行人: 实体类型, 目标: 实体类型 | null, 游戏总控?: 游戏总控接口) => 任务执行结果;
 
 export interface 任务配置 {
   名称: string;
@@ -29,6 +30,7 @@ export interface 任务配置 {
   行动力占用?: 行动力占用计算;
   执行效果: 任务执行效果;
 }
+
 export interface 任务系统接口 {
     注册任务: (任务名: string, 配置: 任务配置) => void;
   }
@@ -63,9 +65,11 @@ export interface 任务结算结果 {
 
 export type 法术执行效果 = (法术倍率: number, 目标: 实体类型 | null, 游戏总控: 游戏总控接口) => 法术执行结果;
 
+
 export interface 法术配置 {
   名称: string;
   价格: number;
+  描述: string;
   法术倍率上限: number;
   执行效果: 法术执行效果;
 }
@@ -93,10 +97,19 @@ export interface 法术使用记录 {
 // ─── 黑市系统 ───
 export type 商品执行效果 = (购买数量: number, 目标: 实体类型 | null, 游戏总控: 游戏总控接口) => 商品执行结果;
 
+export interface 商品执行效果结果 {
+    成功: boolean;
+    类型: string;
+    目标: 可目标实体 | 母畜实体 | null;
+    信息?: string;
+    变化?: Record<string, [number | string, number | string]>;
+  }
+
+
 export interface 商品配置 {
   名称: string;
   价格: number;
-  描述?: string;
+  描述: string;
   每周限购: number;
   执行效果: 商品执行效果;
 }
@@ -121,14 +134,14 @@ export interface 商品实例 {
 
 export interface 奴隶商品 {
     商品ID: string;
-    母畜实体: unknown;
+    母畜实体: 母畜实体;
     价格: number;
     已售出: boolean;
 }
 
 export interface 奴隶刷新配置 {
     刷新数量范围: { 最小: number; 最大: number };
-    价格计算: (母畜: unknown) => number;
+    价格计算: (母畜: 母畜实体) => number;
 }
 
 export interface 购买结果 {
@@ -142,7 +155,7 @@ export interface 奴隶购买结果 {
     成功: boolean;
     原因?: string;
     消耗催淫母乳?: number;
-    获得母畜?: unknown;
+    获得母畜?: 母畜实体;
 }
 
 // ─── 回合系统 ───
@@ -150,23 +163,24 @@ export interface 回合结算摘要 {
     回合数: number;
     任务结算结果: 任务结算结果[];
     法术使用记录: 法术使用记录 | null;
+    战斗结果记录: 战斗结果 | null,
 }
 
 // ─── 游戏总控接口 ───
 export interface 游戏总控接口 {
     地点管理: {
-        获取地点: (地点ID: string) => 可袭击地点实体;
+        获取地点: (地点ID: string) => 可袭击地点实体 | null;
     };
     母畜管理: {
-        从劝诱获取母畜: (母畜: unknown) => void;
-        移除母畜: (母畜ID: string) => void;
+        从劝诱获取母畜: (母畜: 母畜实体) => void;
+        移除母畜: (母畜ID: 母畜实体) => void;
     };
     冠军管理: {
-        从生育获取冠军: (冠军: unknown) => void;
+        从生育获取冠军: (冠军: 冠军实体) => void;
     };
     喽啰池管理: {
         获取喽啰总数: () => number;
-        获取无将领喽啰池: () => 喽啰池;
+        获取无将领喽啰池: () => 喽啰池实体;
         武装升级: (数量: number, 等级: 武装等级) => boolean;
     };
     资源管理: {
@@ -176,7 +190,8 @@ export interface 游戏总控接口 {
         修改催淫母乳数量: (增量: number) => number;
     };
     实体管理: {
-        获取实体: (实体ID: string) => unknown;
+        获取实体: (实体ID: string) => 实体类型 | null;
     };
     获取领主: () => 领主实体;
 }
+
