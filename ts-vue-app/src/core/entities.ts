@@ -199,6 +199,7 @@ class 领主实体 extends 实体基类<领主属性Schema> {
 
 class 冠军实体 extends 实体基类<冠军属性Schema> {
   管理喽啰池: 喽啰池实体 | null;
+  生母: 母畜实体 | null;
 
   constructor(初始数据: 冠军初始数据 = {}) {
     super('冠军', 初始数据);
@@ -214,7 +215,7 @@ class 冠军实体 extends 实体基类<冠军属性Schema> {
     this.设置属性('智力', 初始数据.智力 ?? 10);
 
     this.设置属性('来源', 初始数据.来源 ?? '');
-    this.设置属性('生母', 初始数据.生母 ?? '');
+    this.生母 = 初始数据.生母 ?? null; 
 
     this.管理喽啰池 = 初始数据.管理喽啰池 ?? new 喽啰池实体({ 将领: this });
 
@@ -258,7 +259,7 @@ class 冠军实体 extends 实体基类<冠军属性Schema> {
 class 母畜实体 extends 实体基类<母畜属性Schema> {
   特性列表: Set<string>;
   来源地点ID: string | null;
-  冠军生育记录: string[];
+  冠军生育记录: 冠军实体[];
   喽啰生育记录: number;
 
   constructor(配置: 母畜初始数据 = {}) {
@@ -362,8 +363,8 @@ class 母畜实体 extends 实体基类<母畜属性Schema> {
     return this.特性列表.has(特性名);
   }
 
-  记录生育冠军(冠军实体ID: string): void {
-    this.冠军生育记录.push(冠军实体ID);
+  记录生育冠军(冠军: 冠军实体): void {
+    this.冠军生育记录.push(冠军);
   }
 
   记录生育喽啰(实际产出: number): void {

@@ -24,7 +24,10 @@ import type { 游戏总控接口 } from '../types/systems';
 import type { 喽啰池管理接口 } from '../types/managers';
 import type { 实体类型, 武装等级, 资源状态, 奴隶刷新配置 } from '@/types';
 
-import { 任务管理器, 法术管理器, 黑市管理器, 回合管理器, 喽啰管理器, 战斗管理器, 资源管理器, 实体管理器} from '../core/managers'
+import { 存档管理器 } from '../core/persistence';
+import type { 游戏存档数据 } from '../core/persistence';
+
+import { 任务管理器, 法术管理器, 黑市管理器, 回合管理器, 喽啰管理器, 战斗管理器, 资源管理器, 实体管理器 } from '../core/managers'
 
 
 
@@ -46,6 +49,7 @@ class 游戏总控 implements 游戏总控接口 {
     private 法术管理器实例: 法术管理器;
     private 黑市管理器实例: 黑市管理器;
     private 回合管理器实例: 回合管理器;
+    private 存档管理器实例: 存档管理器;
 
     // 接口实现对象
     readonly 地点管理: {
@@ -89,6 +93,7 @@ class 游戏总控 implements 游戏总控接口 {
         this.法术管理器实例 = new 法术管理器();
         this.黑市管理器实例 = new 黑市管理器();
         this.回合管理器实例 = new 回合管理器();
+        this.存档管理器实例 = new 存档管理器(配置.工厂管理器);
 
 
 
@@ -158,12 +163,12 @@ class 游戏总控 implements 游戏总控接口 {
         this.黑市管理器实例.设置游戏总控(this);
         this.黑市管理器实例.设置工厂管理器(工厂管理器);
         this.回合管理器实例.初始化(this.任务管理器实例, this.法术管理器实例, this.黑市管理器实例, this.战斗管理器实例, this.资源管理器实例);
-      }
+    }
     设置奴隶刷新配置(配置: 奴隶刷新配置): void {
-    this.黑市管理器实例.设置奴隶刷新配置(配置);
+        this.黑市管理器实例.设置奴隶刷新配置(配置);
     }
     设置喽啰池武装等级配置(配置: 奴隶刷新配置): void {
-    this.黑市管理器实例.设置奴隶刷新配置(配置);
+        this.黑市管理器实例.设置奴隶刷新配置(配置);
     }
 
     // ─── 武装升级逻辑 ───
@@ -326,6 +331,24 @@ class 游戏总控 implements 游戏总控接口 {
             实体统计: this.实体管理器实例.获取实体统计(),
             领主魔力: this.实体管理器实例.获取领主()?.获取属性('魔力') ?? 0,
         };
+    }
+
+    // ─── 存档系统访问 ───
+
+    获取存档管理器(): 存档管理器 {
+        return this.存档管理器实例;
+    }
+
+    // ─── 存档快捷方法 ───
+
+    获取存档数据(): 游戏存档数据 | null { 
+        return this.存档管理器实例.获取存档数据(this);
+    }
+
+
+    加载存档数据(存档: 游戏存档数据): { 成功: boolean; 原因?: string } {
+        const 成功 = this.存档管理器实例.加载存档数据(存档, this);
+        return { 成功 };
     }
 }
 

@@ -8,14 +8,17 @@ import { 冠军实体, 母畜实体, 可袭击地点实体, 领主实体, 喽啰
 import { 工厂管理器 } from './factories';
 
 
-import type { 实体类型,可执行实体, 可目标实体, 武装等级, 任务前置条件, 任务执行结果, 战斗结果, 回合结算摘要, 
-  任务配置, 已发布任务, 任务结算结果, 
+import type {
+  实体类型, 可执行实体, 可目标实体, 武装等级, 任务前置条件, 任务执行结果, 战斗结果, 回合结算摘要,
+  任务配置, 已发布任务, 任务结算结果,
   法术执行结果, 法术配置, 法术使用记录, 商品执行效果结果, 商品配置, 商品实例, 奴隶商品, 奴隶刷新配置, 购买结果, 奴隶购买结果, 游戏总控接口
 } from '../types/index';
 
-import type {分配请求, 分配结果, 战斗部署, 
-  战斗配置, 快速填充结果, 喽啰池管理接口, 
-  战斗系统依赖, 资源状态, 实体统计} from '../types/';
+import type {
+  分配请求, 分配结果, 战斗部署,
+  战斗配置, 快速填充结果, 喽啰池管理接口,
+  战斗系统依赖, 资源状态, 实体统计
+} from '../types/';
 
 
 // ═══════════════════════════════════════════════════════════════
@@ -61,7 +64,7 @@ class 任务管理器 {
 
   // ─── 占用状态查询 ───
 
-  
+
   占用实体(实体: 实体类型): void {
     this.被占用目标.add(实体.实体ID);
   }
@@ -443,73 +446,73 @@ class 资源管理器 {
   private 催淫母乳: number;
 
   constructor(初始配置: Partial<资源状态> = {}) {
-      this.士气 = 初始配置.士气 ?? 50;
-      this.最大士气 = 初始配置.最大士气 ?? 100;
-      this.催淫母乳 = 初始配置.催淫母乳 ?? 0;
+    this.士气 = 初始配置.士气 ?? 50;
+    this.最大士气 = 初始配置.最大士气 ?? 100;
+    this.催淫母乳 = 初始配置.催淫母乳 ?? 0;
   }
 
   // ─── 士气操作 ───
 
   获取士气(): number {
-      return this.士气;
+    return this.士气;
   }
 
   获取最大士气(): number {
-      return this.最大士气;
+    return this.最大士气;
   }
 
   修改士气(增量: number): number {
-      this.士气 = Math.max(0, Math.min(this.最大士气, this.士气 + 增量));
-      return this.士气;
+    this.士气 = Math.max(0, Math.min(this.最大士气, this.士气 + 增量));
+    return this.士气;
   }
 
   设置士气(值: number): void {
-      this.士气 = Math.max(0, Math.min(this.最大士气, 值));
+    this.士气 = Math.max(0, Math.min(this.最大士气, 值));
   }
 
   设置最大士气(值: number): void {
-      this.最大士气 = Math.max(0, 值);
-      if (this.士气 > this.最大士气) {
-          this.士气 = this.最大士气;
-      }
+    this.最大士气 = Math.max(0, 值);
+    if (this.士气 > this.最大士气) {
+      this.士气 = this.最大士气;
+    }
   }
 
   获取士气百分比(): number {
-      return this.最大士气 > 0 ? (this.士气 / this.最大士气) * 100 : 0;
+    return this.最大士气 > 0 ? (this.士气 / this.最大士气) * 100 : 0;
   }
 
   // ─── 催淫母乳操作 ───
 
   获取催淫母乳数量(): number {
-      return this.催淫母乳;
+    return this.催淫母乳;
   }
 
   修改催淫母乳数量(增量: number): number {
-      this.催淫母乳 = Math.max(0, this.催淫母乳 + 增量);
-      return this.催淫母乳;
+    this.催淫母乳 = Math.max(0, this.催淫母乳 + 增量);
+    return this.催淫母乳;
   }
 
   设置催淫母乳数量(值: number): void {
-      this.催淫母乳 = Math.max(0, 值);
+    this.催淫母乳 = Math.max(0, 值);
   }
 
   // ─── 状态查询 ───
 
   获取资源状态(): 资源状态 {
-      return {
-          士气: this.士气,
-          最大士气: this.最大士气,
-          催淫母乳: this.催淫母乳,
-      };
+    return {
+      士气: this.士气,
+      最大士气: this.最大士气,
+      催淫母乳: this.催淫母乳,
+    };
   }
 
   // ─── 回合结算 ───
 
   回合结算(): void {
-      const 衰减上限 = 10;
-      const 理论衰减 = Math.floor(this.士气 / 8)
-      const 衰减 = Math.min(理论衰减, 衰减上限);
-      this.修改士气(-衰减);
+    const 衰减上限 = 10;
+    const 理论衰减 = Math.floor(this.士气 / 8)
+    const 衰减 = Math.min(理论衰减, 衰减上限);
+    this.修改士气(-衰减);
   }
 }
 
@@ -526,12 +529,12 @@ class 实体管理器 {
   private 无将领喽啰池: 喽啰池实体;
 
   constructor() {
-      this.领主实例 = null;
-      this.冠军表 = new Map();
-      this.母畜表 = new Map();
-      this.地点表 = new Map();
-      this.喽啰池表 = new Map();
-      this.无将领喽啰池 = new 喽啰池实体();
+    this.领主实例 = null;
+    this.冠军表 = new Map();
+    this.母畜表 = new Map();
+    this.地点表 = new Map();
+    this.喽啰池表 = new Map();
+    this.无将领喽啰池 = new 喽啰池实体();
   }
 
 
@@ -539,152 +542,179 @@ class 实体管理器 {
   // ─── 领主管理 ───
 
   设置领主(领主: 领主实体): void {
-      this.领主实例 = 领主;
+    this.领主实例 = 领主;
   }
 
   获取领主(): 领主实体 | null {
-      return this.领主实例;
+    return this.领主实例;
   }
 
   // ─── 冠军管理 ───
 
   添加冠军(冠军: 冠军实体): void {
-      this.冠军表.set(冠军.实体ID, 冠军);
+    this.冠军表.set(冠军.实体ID, 冠军);
 
-      // 注册冠军的喽啰池
-      const 喽啰池实例 = 冠军.获取喽啰池();
-      if (喽啰池实例) {
-          this.喽啰池表.set(喽啰池实例.实体ID, 喽啰池实例);
-      }
+    // 注册冠军的喽啰池
+    const 喽啰池实例 = 冠军.获取喽啰池();
+    if (喽啰池实例) {
+      this.喽啰池表.set(喽啰池实例.实体ID, 喽啰池实例);
+    }
   }
 
   移除冠军(冠军ID: string): boolean {
-      const 冠军 = this.冠军表.get(冠军ID);
-      if (!冠军) return false;
+    const 冠军 = this.冠军表.get(冠军ID);
+    if (!冠军) return false;
 
-      // 移除关联的喽啰池
-      const 喽啰池实例 = 冠军.获取喽啰池();
-      if (喽啰池实例) {
-          this.喽啰池表.delete(喽啰池实例.实体ID);
-      }
+    // 移除关联的喽啰池
+    const 喽啰池实例 = 冠军.获取喽啰池();
+    if (喽啰池实例) {
+      this.喽啰池表.delete(喽啰池实例.实体ID);
+    }
 
-      this.冠军表.delete(冠军ID);
-      return true;
+    this.冠军表.delete(冠军ID);
+    return true;
   }
 
   获取冠军(冠军ID: string): 冠军实体 | null {
-      return this.冠军表.get(冠军ID) ?? null;
+    return this.冠军表.get(冠军ID) ?? null;
   }
 
   获取所有冠军(): 冠军实体[] {
-      return Array.from(this.冠军表.values());
+    return Array.from(this.冠军表.values());
   }
 
   // ─── 母畜管理 ───
 
   添加母畜(母畜: 母畜实体): void {
-      this.母畜表.set(母畜.实体ID, 母畜);
+    this.母畜表.set(母畜.实体ID, 母畜);
   }
 
   移除母畜(母畜: 母畜实体): boolean {
-      return this.母畜表.delete(母畜.实体ID);
+    return this.母畜表.delete(母畜.实体ID);
   }
 
   获取母畜(母畜ID: string): 母畜实体 | null {
-      return this.母畜表.get(母畜ID) ?? null;
+    return this.母畜表.get(母畜ID) ?? null;
   }
 
   获取所有母畜(): 母畜实体[] {
-      return Array.from(this.母畜表.values());
+    return Array.from(this.母畜表.values());
   }
 
   // ─── 地点管理 ───
 
   添加地点(地点: 可袭击地点实体): void {
-      this.地点表.set(地点.实体ID, 地点);
+    this.地点表.set(地点.实体ID, 地点);
   }
 
   移除地点(地点ID: string): boolean {
-      return this.地点表.delete(地点ID);
+    return this.地点表.delete(地点ID);
   }
 
   获取地点(地点ID: string): 可袭击地点实体 | null {
-      return this.地点表.get(地点ID) ?? null;
+    return this.地点表.get(地点ID) ?? null;
   }
 
   获取所有地点(): 可袭击地点实体[] {
-      return Array.from(this.地点表.values());
+    return Array.from(this.地点表.values());
   }
 
   // ─── 喽啰池管理 ───
 
   获取无将领喽啰池(): 喽啰池实体 {
-      return this.无将领喽啰池;
+    return this.无将领喽啰池;
   }
 
   获取所有将领喽啰池(): Map<string, 喽啰池实体> {
-      const 将领池表 = new Map<string, 喽啰池实体>();
-      for (const [id, 池] of this.喽啰池表) {
-          if (池.获取将领() !== null) {
-              将领池表.set(id, 池);
-          }
+    const 将领池表 = new Map<string, 喽啰池实体>();
+    for (const [id, 池] of this.喽啰池表) {
+      if (池.获取将领() !== null) {
+        将领池表.set(id, 池);
       }
-      return 将领池表;
+    }
+    return 将领池表;
   }
 
   获取喽啰总数(): number {
-      let 总数 = this.无将领喽啰池.获取总数量();
-      for (const 池 of this.喽啰池表.values()) {
-          总数 += 池.获取总数量();
-      }
-      return 总数;
+    let 总数 = this.无将领喽啰池.获取总数量();
+    for (const 池 of this.喽啰池表.values()) {
+      总数 += 池.获取总数量();
+    }
+    return 总数;
   }
 
-  // ─── 通用实体查询 ───
+  // ─── 通用 ───
+
+  清空所有实体(): void {
+    this.冠军表.forEach(冠军 => 冠军.销毁());
+    this.母畜表.forEach(母畜 => 母畜.销毁());
+    this.地点表.forEach(地点 => 地点.销毁());
+    this.喽啰池表.forEach(池 => 池.销毁());
+
+    this.领主实例 = null;
+    this.冠军表.clear();
+    this.母畜表.clear();
+    this.地点表.clear();
+    this.喽啰池表.clear();
+
+    this.无将领喽啰池 = new 喽啰池实体();
+  }
 
   获取实体(实体ID: string): 实体类型 | null {
-      // 检查领主
-      if (this.领主实例?.实体ID === 实体ID) {
-          return this.领主实例;
-      }
+    // 检查领主
+    if (this.领主实例?.实体ID === 实体ID) {
+      return this.领主实例;
+    }
 
-      // 检查冠军
-      if (this.冠军表.has(实体ID)) {
-          return this.冠军表.get(实体ID)!;
-      }
+    // 检查冠军
+    if (this.冠军表.has(实体ID)) {
+      return this.冠军表.get(实体ID)!;
+    }
 
-      // 检查母畜
-      if (this.母畜表.has(实体ID)) {
-          return this.母畜表.get(实体ID)!;
-      }
+    // 检查母畜
+    if (this.母畜表.has(实体ID)) {
+      return this.母畜表.get(实体ID)!;
+    }
 
-      // 检查地点
-      if (this.地点表.has(实体ID)) {
-          return this.地点表.get(实体ID)!;
-      }
+    // 检查地点
+    if (this.地点表.has(实体ID)) {
+      return this.地点表.get(实体ID)!;
+    }
 
-      // 检查喽啰池
-      if (this.喽啰池表.has(实体ID)) {
-          return this.喽啰池表.get(实体ID)!;
-      }
+    // 检查喽啰池
+    if (this.喽啰池表.has(实体ID)) {
+      return this.喽啰池表.get(实体ID)!;
+    }
 
-      if (this.无将领喽啰池.实体ID === 实体ID) {
-          return this.无将领喽啰池;
-      }
+    if (this.无将领喽啰池.实体ID === 实体ID) {
+      return this.无将领喽啰池;
+    }
 
-      return null;
+    return null;
   }
 
   // ─── 统计 ───
 
   获取实体统计(): 实体统计 {
-      return {
-          领主数量: this.领主实例 ? 1 : 0,
-          冠军数量: this.冠军表.size,
-          母畜数量: this.母畜表.size,
-          地点数量: this.地点表.size,
-          喽啰总数: this.获取喽啰总数(),
-      };
+    return {
+      领主数量: this.领主实例 ? 1 : 0,
+      冠军数量: this.冠军表.size,
+      母畜数量: this.母畜表.size,
+      地点数量: this.地点表.size,
+      喽啰总数: this.获取喽啰总数(),
+    };
+  }
+
+  批量添加冠军(冠军列表: 冠军实体[]): void {
+    冠军列表.forEach(冠军 => this.添加冠军(冠军));
+  }
+
+  批量添加母畜(母畜列表: 母畜实体[]): void {
+    母畜列表.forEach(母畜 => this.添加母畜(母畜));
+  }
+
+  批量添加地点(地点列表: 可袭击地点实体[]): void {
+    地点列表.forEach(地点 => this.添加地点(地点));
   }
 }
 
@@ -697,19 +727,19 @@ class 喽啰管理器 {
   private 武装优先级: 武装等级[];
 
   constructor(喽啰池管理: 喽啰池管理接口) {
-      this.喽啰池管理 = 喽啰池管理;
-      // 按战斗力从高到低排序
-      this.武装优先级 = ['精英武装', '高级武装', '中级武装', '低级武装', '未武装'];
+    this.喽啰池管理 = 喽啰池管理;
+    // 按战斗力从高到低排序
+    this.武装优先级 = ['精英武装', '高级武装', '中级武装', '低级武装', '未武装'];
   }
 
   // ─── 获取喽啰池状态 ───
 
   获取无将领喽啰池(): 喽啰池实体 {
-      return this.喽啰池管理.获取无将领喽啰池();
+    return this.喽啰池管理.获取无将领喽啰池();
   }
 
   获取将领喽啰池(将领: 冠军实体): 喽啰池实体 | null {
-      return 将领.获取喽啰池();
+    return 将领.获取喽啰池();
   }
 
   // ─── 基础分配操作 ───
@@ -719,91 +749,91 @@ class 喽啰管理器 {
    * 从无将领池向将领池分配喽啰
    */
   分配到将领(将领: 冠军实体, 请求列表: 分配请求[]): 分配结果 {
-      const 目标池 = 将领.获取喽啰池();
-      if (!目标池) {
-          return { 成功: false, 原因: '将领未绑定喽啰池', 实际分配: 0, 分配详情: [] };
+    const 目标池 = 将领.获取喽啰池();
+    if (!目标池) {
+      return { 成功: false, 原因: '将领未绑定喽啰池', 实际分配: 0, 分配详情: [] };
+    }
+
+    const 无将领池 = this.获取无将领喽啰池();
+    const 可用容量 = 目标池.获取最大数量() - 目标池.获取总数量();
+
+    if (可用容量 <= 0) {
+      return { 成功: false, 原因: '将领喽啰池已满', 实际分配: 0, 分配详情: [] };
+    }
+
+    let 总分配 = 0;
+    const 分配详情: Array<{ 等级: string; 数量: number }> = [];
+
+    for (const 请求 of 请求列表) {
+      const 剩余容量 = 可用容量 - 总分配;
+      if (剩余容量 <= 0) break;
+
+      const 实际需求 = Math.min(请求.数量, 剩余容量);
+      const 来源数量 = 无将领池.获取分组数量(请求.武装等级);
+      const 实际分配数量 = Math.min(实际需求, 来源数量);
+
+      if (实际分配数量 > 0) {
+        无将领池.减少喽啰(实际分配数量, 请求.武装等级);
+        目标池.增加喽啰(实际分配数量, 请求.武装等级);
+        总分配 += 实际分配数量;
+        分配详情.push({ 等级: 请求.武装等级, 数量: 实际分配数量 });
       }
+    }
 
-      const 无将领池 = this.获取无将领喽啰池();
-      const 可用容量 = 目标池.获取最大数量() - 目标池.获取总数量();
-
-      if (可用容量 <= 0) {
-          return { 成功: false, 原因: '将领喽啰池已满', 实际分配: 0, 分配详情: [] };
-      }
-
-      let 总分配 = 0;
-      const 分配详情: Array<{ 等级: string; 数量: number }> = [];
-
-      for (const 请求 of 请求列表) {
-          const 剩余容量 = 可用容量 - 总分配;
-          if (剩余容量 <= 0) break;
-
-          const 实际需求 = Math.min(请求.数量, 剩余容量);
-          const 来源数量 = 无将领池.获取分组数量(请求.武装等级);
-          const 实际分配数量 = Math.min(实际需求, 来源数量);
-
-          if (实际分配数量 > 0) {
-              无将领池.减少喽啰(实际分配数量, 请求.武装等级);
-              目标池.增加喽啰(实际分配数量, 请求.武装等级);
-              总分配 += 实际分配数量;
-              分配详情.push({ 等级: 请求.武装等级, 数量: 实际分配数量 });
-          }
-      }
-
-      return {
-          成功: 总分配 > 0,
-          实际分配: 总分配,
-          分配详情,
-      };
+    return {
+      成功: 总分配 > 0,
+      实际分配: 总分配,
+      分配详情,
+    };
   }
 
   /**
    * 从将领池向无将领池归还喽啰
    */
   归还到公共池(将领: 冠军实体, 请求列表: 分配请求[]): 分配结果 {
-      const 来源池 = 将领.获取喽啰池();
-      if (!来源池) {
-          return { 成功: false, 原因: '将领未绑定喽啰池', 实际分配: 0, 分配详情: [] };
+    const 来源池 = 将领.获取喽啰池();
+    if (!来源池) {
+      return { 成功: false, 原因: '将领未绑定喽啰池', 实际分配: 0, 分配详情: [] };
+    }
+
+    const 无将领池 = this.获取无将领喽啰池();
+    let 总归还 = 0;
+    const 分配详情: Array<{ 等级: string; 数量: number }> = [];
+
+    for (const 请求 of 请求列表) {
+      const 来源数量 = 来源池.获取分组数量(请求.武装等级);
+      const 实际归还数量 = Math.min(请求.数量, 来源数量);
+
+      if (实际归还数量 > 0) {
+        来源池.减少喽啰(实际归还数量, 请求.武装等级);
+        无将领池.增加喽啰(实际归还数量, 请求.武装等级);
+        总归还 += 实际归还数量;
+        分配详情.push({ 等级: 请求.武装等级, 数量: 实际归还数量 });
       }
+    }
 
-      const 无将领池 = this.获取无将领喽啰池();
-      let 总归还 = 0;
-      const 分配详情: Array<{ 等级: string; 数量: number }> = [];
-
-      for (const 请求 of 请求列表) {
-          const 来源数量 = 来源池.获取分组数量(请求.武装等级);
-          const 实际归还数量 = Math.min(请求.数量, 来源数量);
-
-          if (实际归还数量 > 0) {
-              来源池.减少喽啰(实际归还数量, 请求.武装等级);
-              无将领池.增加喽啰(实际归还数量, 请求.武装等级);
-              总归还 += 实际归还数量;
-              分配详情.push({ 等级: 请求.武装等级, 数量: 实际归还数量 });
-          }
-      }
-
-      return {
-          成功: 总归还 > 0,
-          实际分配: 总归还,
-          分配详情,
-      };
+    return {
+      成功: 总归还 > 0,
+      实际分配: 总归还,
+      分配详情,
+    };
   }
 
   /**
    * 清空将领喽啰池，全部归还公共池
    */
   清空将领喽啰池(将领: 冠军实体): 分配结果 {
-      const 来源池 = 将领.获取喽啰池();
-      if (!来源池) {
-          return { 成功: false, 原因: '将领未绑定喽啰池', 实际分配: 0, 分配详情: [] };
-      }
+    const 来源池 = 将领.获取喽啰池();
+    if (!来源池) {
+      return { 成功: false, 原因: '将领未绑定喽啰池', 实际分配: 0, 分配详情: [] };
+    }
 
-      const 分组详情 = 来源池.获取分组详情();
-      const 请求列表: 分配请求[] = 分组详情
-          .filter(分组 => 分组.数量 > 0)
-          .map(分组 => ({ 武装等级: 分组.等级, 数量: 分组.数量 }));
+    const 分组详情 = 来源池.获取分组详情();
+    const 请求列表: 分配请求[] = 分组详情
+      .filter(分组 => 分组.数量 > 0)
+      .map(分组 => ({ 武装等级: 分组.等级, 数量: 分组.数量 }));
 
-      return this.归还到公共池(将领, 请求列表);
+    return this.归还到公共池(将领, 请求列表);
   }
 
   // ─── 快速填充（最大化战斗力）───
@@ -812,98 +842,98 @@ class 喽啰管理器 {
    * 快速填充将领喽啰池至上限，优先选择高战斗力武装
    */
   快速填充到上限(将领: 冠军实体): 快速填充结果 {
-      const 目标池 = 将领.获取喽啰池();
-      if (!目标池) {
-          return { 成功: false, 原因: '将领未绑定喽啰池', 填充数量: 0, 当前战斗力: 0, 填充详情: [] };
-      }
+    const 目标池 = 将领.获取喽啰池();
+    if (!目标池) {
+      return { 成功: false, 原因: '将领未绑定喽啰池', 填充数量: 0, 当前战斗力: 0, 填充详情: [] };
+    }
 
-      const 无将领池 = this.获取无将领喽啰池();
-      const 最大容量 = 目标池.获取最大数量();
-      const 当前数量 = 目标池.获取总数量();
-      let 剩余容量 = 最大容量 - 当前数量;
+    const 无将领池 = this.获取无将领喽啰池();
+    const 最大容量 = 目标池.获取最大数量();
+    const 当前数量 = 目标池.获取总数量();
+    let 剩余容量 = 最大容量 - 当前数量;
 
-      if (剩余容量 <= 0) {
-          return {
-              成功: true,
-              原因: '喽啰池已满',
-              填充数量: 0,
-              当前战斗力: 目标池.获取战斗力(),
-              填充详情: [],
-          };
-      }
-
-      const 填充详情: Array<{ 等级: string; 数量: number }> = [];
-      let 总填充 = 0;
-
-      // 按战斗力优先级填充
-      for (const 武装等级 of this.武装优先级) {
-          if (剩余容量 <= 0) break;
-
-          const 可用数量 = 无将领池.获取分组数量(武装等级);
-          const 填充数量 = Math.min(可用数量, 剩余容量);
-
-          if (填充数量 > 0) {
-              无将领池.减少喽啰(填充数量, 武装等级);
-              目标池.增加喽啰(填充数量, 武装等级);
-              剩余容量 -= 填充数量;
-              总填充 += 填充数量;
-              填充详情.push({ 等级: 武装等级, 数量: 填充数量 });
-          }
-      }
-
+    if (剩余容量 <= 0) {
       return {
-          成功: true,
-          填充数量: 总填充,
-          当前战斗力: 目标池.获取战斗力(),
-          填充详情,
+        成功: true,
+        原因: '喽啰池已满',
+        填充数量: 0,
+        当前战斗力: 目标池.获取战斗力(),
+        填充详情: [],
       };
+    }
+
+    const 填充详情: Array<{ 等级: string; 数量: number }> = [];
+    let 总填充 = 0;
+
+    // 按战斗力优先级填充
+    for (const 武装等级 of this.武装优先级) {
+      if (剩余容量 <= 0) break;
+
+      const 可用数量 = 无将领池.获取分组数量(武装等级);
+      const 填充数量 = Math.min(可用数量, 剩余容量);
+
+      if (填充数量 > 0) {
+        无将领池.减少喽啰(填充数量, 武装等级);
+        目标池.增加喽啰(填充数量, 武装等级);
+        剩余容量 -= 填充数量;
+        总填充 += 填充数量;
+        填充详情.push({ 等级: 武装等级, 数量: 填充数量 });
+      }
+    }
+
+    return {
+      成功: true,
+      填充数量: 总填充,
+      当前战斗力: 目标池.获取战斗力(),
+      填充详情,
+    };
   }
 
   /**
    * 优化将领喽啰池配置（替换低级武装为高级武装）
    */
   优化战斗力配置(将领: 冠军实体): 快速填充结果 {
-      // 先清空再重新填充，确保最优配置
-      this.清空将领喽啰池(将领);
-      return this.快速填充到上限(将领);
+    // 先清空再重新填充，确保最优配置
+    this.清空将领喽啰池(将领);
+    return this.快速填充到上限(将领);
   }
 
   // ─── 查询方法 ───
 
   获取分配预览(将领: 冠军实体): {
-      当前数量: number;
-      最大数量: number;
-      当前战斗力: number;
-      分组详情: Array<{ 等级: string; 数量: number; 战斗力: number }>;
+    当前数量: number;
+    最大数量: number;
+    当前战斗力: number;
+    分组详情: Array<{ 等级: string; 数量: number; 战斗力: number }>;
   } | null {
-      const 目标池 = 将领.获取喽啰池();
-      if (!目标池) return null;
+    const 目标池 = 将领.获取喽啰池();
+    if (!目标池) return null;
 
-      return {
-          当前数量: 目标池.获取总数量(),
-          最大数量: 目标池.获取最大数量(),
-          当前战斗力: 目标池.获取战斗力(),
-          分组详情: 目标池.获取分组详情().map(分组 => ({
-              等级: 分组.等级,
-              数量: 分组.数量,
-              战斗力: 分组.战斗力,
-          })),
-      };
+    return {
+      当前数量: 目标池.获取总数量(),
+      最大数量: 目标池.获取最大数量(),
+      当前战斗力: 目标池.获取战斗力(),
+      分组详情: 目标池.获取分组详情().map(分组 => ({
+        等级: 分组.等级,
+        数量: 分组.数量,
+        战斗力: 分组.战斗力,
+      })),
+    };
   }
 
   获取公共池状态(): {
-      总数量: number;
-      分组详情: Array<{ 等级: string; 数量: number; 战斗力: number }>;
+    总数量: number;
+    分组详情: Array<{ 等级: string; 数量: number; 战斗力: number }>;
   } {
-      const 无将领池 = this.获取无将领喽啰池();
-      return {
-          总数量: 无将领池.获取总数量(),
-          分组详情: 无将领池.获取分组详情().map(分组 => ({
-              等级: 分组.等级,
-              数量: 分组.数量,
-              战斗力: 分组.战斗力,
-          })),
-      };
+    const 无将领池 = this.获取无将领喽啰池();
+    return {
+      总数量: 无将领池.获取总数量(),
+      分组详情: 无将领池.获取分组详情().map(分组 => ({
+        等级: 分组.等级,
+        数量: 分组.数量,
+        战斗力: 分组.战斗力,
+      })),
+    };
   }
 }
 
@@ -925,54 +955,54 @@ class 战斗管理器 {
   private static readonly 突袭战力系数 = 0.8;
 
   constructor(依赖: 战斗系统依赖) {
-      this.依赖 = 依赖;
-      this.喽啰调配器实例 = new 喽啰管理器(依赖.喽啰池管理);
-      this.当前部署 = new Map();
-      this.选定目标 = null;
-      this.突袭模式 = false;
-      this.是否战斗 = false;
+    this.依赖 = 依赖;
+    this.喽啰调配器实例 = new 喽啰管理器(依赖.喽啰池管理);
+    this.当前部署 = new Map();
+    this.选定目标 = null;
+    this.突袭模式 = false;
+    this.是否战斗 = false;
   }
 
   // ─── 喽啰调配器访问 ───
 
   获取喽啰调配器(): 喽啰管理器 {
-      return this.喽啰调配器实例;
+    return this.喽啰调配器实例;
   }
 
   // ─── 目标选择 ───
 
   选择目标(地点输入: 可袭击地点实体 | string): { 成功: boolean; 原因?: string } {
-      let 地点: 可袭击地点实体 | null = null;
-      if (typeof 地点输入 === 'string') { 
-          地点 = this.依赖.获取地点(地点输入);
-      } else { 
-          地点 = 地点输入;
-      }
+    let 地点: 可袭击地点实体 | null = null;
+    if (typeof 地点输入 === 'string') {
+      地点 = this.依赖.获取地点(地点输入);
+    } else {
+      地点 = 地点输入;
+    }
 
-      if (!地点) {
-          return { 成功: false, 原因: '地点不存在' };
-      }
+    if (!地点) {
+      return { 成功: false, 原因: '地点不存在' };
+    }
 
-      this.选定目标 = 地点;
-      return { 成功: true };
+    this.选定目标 = 地点;
+    return { 成功: true };
   }
 
   取消目标选择(): void {
-      this.选定目标 = null;
+    this.选定目标 = null;
   }
 
   获取选定目标(): 可袭击地点实体 | null {
-      return this.选定目标;
+    return this.选定目标;
   }
 
   // ─── 突袭模式 ───
 
   设置突袭模式(启用: boolean): void {
-      this.突袭模式 = 启用;
+    this.突袭模式 = 启用;
   }
 
   获取突袭模式(): boolean {
-      return this.突袭模式;
+    return this.突袭模式;
   }
 
   // ─── 将领部署 ───
@@ -981,272 +1011,272 @@ class 战斗管理器 {
    * 添加将领到出战列表
    */
   添加出战将领(将领输入: 冠军实体 | string): { 成功: boolean; 原因?: string } {
-      let 将领: 冠军实体 | null;
-      try {
-          将领 = typeof 将领输入 == 'string' ? this.依赖.获取将领(将领输入) : 将领输入;
-      } catch (error) {
-          return { 成功: false, 原因: '获取将领时发生错误' };
-      }
+    let 将领: 冠军实体 | null;
+    try {
+      将领 = typeof 将领输入 == 'string' ? this.依赖.获取将领(将领输入) : 将领输入;
+    } catch (error) {
+      return { 成功: false, 原因: '获取将领时发生错误' };
+    }
 
-      if (!将领) {
-          return { 成功: false, 原因: '将领不存在' };
-      }
+    if (!将领) {
+      return { 成功: false, 原因: '将领不存在' };
+    }
 
 
-      // 检查是否已部署
-      if (this.当前部署.has(将领.实体ID)) {
-          return { 成功: false, 原因: '将领已在出战列表中' };
-      }
+    // 检查是否已部署
+    if (this.当前部署.has(将领.实体ID)) {
+      return { 成功: false, 原因: '将领已在出战列表中' };
+    }
 
-      // 检查任务系统占用
-      if (this.依赖.任务管理器.执行人是否被占用(将领.实体ID)) {
-          return { 成功: false, 原因: '将领在任务系统中被占用' };
-      }
+    // 检查任务系统占用
+    if (this.依赖.任务管理器.执行人是否被占用(将领.实体ID)) {
+      return { 成功: false, 原因: '将领在任务系统中被占用' };
+    }
 
-      // 检查是否有喽啰池
-      const 喽啰池 = 将领.获取喽啰池();
-      if (!喽啰池) {
-          return { 成功: false, 原因: '将领未绑定喽啰池' };
-      }
+    // 检查是否有喽啰池
+    const 喽啰池 = 将领.获取喽啰池();
+    if (!喽啰池) {
+      return { 成功: false, 原因: '将领未绑定喽啰池' };
+    }
 
-      this.依赖.任务管理器.占用实体(将领);
+    this.依赖.任务管理器.占用实体(将领);
 
-      // 计算战斗力
-      const 基础战斗力 = 喽啰池.获取战斗力();
-      const 实际战斗力 = this.突袭模式 ? 基础战斗力 * 战斗管理器.突袭战力系数 : 基础战斗力;
+    // 计算战斗力
+    const 基础战斗力 = 喽啰池.获取战斗力();
+    const 实际战斗力 = this.突袭模式 ? 基础战斗力 * 战斗管理器.突袭战力系数 : 基础战斗力;
 
-      this.当前部署.set(将领.实体ID, {
-          将领ID: 将领.实体ID,
-          将领,
-          喽啰池,
-          战斗力: 实际战斗力,
-      });
+    this.当前部署.set(将领.实体ID, {
+      将领ID: 将领.实体ID,
+      将领,
+      喽啰池,
+      战斗力: 实际战斗力,
+    });
 
-      return { 成功: true };
+    return { 成功: true };
   }
 
   /**
    * 从出战列表移除将领
    */
   移除出战将领(将领输入: 冠军实体 | string): { 成功: boolean; 原因?: string } {
-      let 将领: 冠军实体 | null;
-      try {
-          将领 = typeof 将领输入 == 'string' ? this.依赖.获取将领(将领输入) : 将领输入;
-      } catch (error) {
-          return { 成功: false, 原因: '获取将领时发生错误' };
-      }
-      if (!将领) {
-          return { 成功: false, 原因: '将领不存在' };
-      }
-      const 将领ID = 将领.实体ID;
-      if (!this.当前部署.has(将领ID)) {
-          return { 成功: false, 原因: '将领不在出战列表中' };
-      }
+    let 将领: 冠军实体 | null;
+    try {
+      将领 = typeof 将领输入 == 'string' ? this.依赖.获取将领(将领输入) : 将领输入;
+    } catch (error) {
+      return { 成功: false, 原因: '获取将领时发生错误' };
+    }
+    if (!将领) {
+      return { 成功: false, 原因: '将领不存在' };
+    }
+    const 将领ID = 将领.实体ID;
+    if (!this.当前部署.has(将领ID)) {
+      return { 成功: false, 原因: '将领不在出战列表中' };
+    }
 
-      this.当前部署.delete(将领ID);
-      if (将领) {
-          this.依赖.任务管理器.释放实体(将领);
-      }
-      return { 成功: true };
+    this.当前部署.delete(将领ID);
+    if (将领) {
+      this.依赖.任务管理器.释放实体(将领);
+    }
+    return { 成功: true };
   }
 
   /**
    * 清空出战列表
    */
   清空出战列表(): void {
-      this.当前部署.forEach(战斗部署 => {
-          this.移除出战将领(战斗部署.将领ID);
-      });
+    this.当前部署.forEach(战斗部署 => {
+      this.移除出战将领(战斗部署.将领ID);
+    });
   }
 
   // ─── 查询方法 ───
 
   获取当前部署列表(): 战斗部署[] {
-      return Array.from(this.当前部署.values());
+    return Array.from(this.当前部署.values());
   }
 
   获取可出战将领(所有将领: 冠军实体[]): 冠军实体[] {
-      return 所有将领.filter(将领 => {
-          // 未被任务占用
-          if (this.依赖.任务管理器.执行人是否被占用(将领.实体ID)) return false;
-          // 未在当前部署中
-          if (this.当前部署.has(将领.实体ID)) return false;
-          // 有喽啰池
-          if (!将领.获取喽啰池()) return false;
-          return true;
-      });
+    return 所有将领.filter(将领 => {
+      // 未被任务占用
+      if (this.依赖.任务管理器.执行人是否被占用(将领.实体ID)) return false;
+      // 未在当前部署中
+      if (this.当前部署.has(将领.实体ID)) return false;
+      // 有喽啰池
+      if (!将领.获取喽啰池()) return false;
+      return true;
+    });
   }
 
   计算总战斗力(): number {
-      let 总战力 = 0;
-      for (const 部署 of this.当前部署.values()) {
-          总战力 += 部署.战斗力;
-      }
-      return 总战力;
+    let 总战力 = 0;
+    for (const 部署 of this.当前部署.values()) {
+      总战力 += 部署.战斗力;
+    }
+    return 总战力;
   }
 
   计算行动力消耗(): number {
-      if (this.当前部署.size === 0) return 0;
-      return this.突袭模式 ? 战斗管理器.突袭出战行动力 : 战斗管理器.普通出战行动力;
+    if (this.当前部署.size === 0) return 0;
+    return this.突袭模式 ? 战斗管理器.突袭出战行动力 : 战斗管理器.普通出战行动力;
   }
 
-  计算胜率(我方战斗力: number, 敌方战斗力: number, 目标: 可袭击地点实体){
-      const 战力比 = 我方战斗力 / (敌方战斗力 + 1);
-      const 侦察修正 = Math.min(Math.log(Math.E - 1 + 目标.获取侦察进度()/目标.获取侦查最大值()), 1);
-      const 基础胜率 = 0.5 + Math.log(战力比);
-      const 胜率 = Math.min(1, Math.max(0, 基础胜率 * 侦察修正));
-      return 胜率;
+  计算胜率(我方战斗力: number, 敌方战斗力: number, 目标: 可袭击地点实体) {
+    const 战力比 = 我方战斗力 / (敌方战斗力 + 1);
+    const 侦察修正 = Math.min(Math.log(Math.E - 1 + 目标.获取侦察进度() / 目标.获取侦查最大值()), 1);
+    const 基础胜率 = 0.5 + Math.log(战力比);
+    const 胜率 = Math.min(1, Math.max(0, 基础胜率 * 侦察修正));
+    return 胜率;
   }
 
   // ─── 战斗预览 ───
 
   获取战斗预览(): {
-      可执行: boolean;
-      原因?: string;
-      目标?: {
-          名称: string;
-          战斗力: number;
-      };
-      我方?: {
-          总战斗力: number;
-          将领数量: number;
-          行动力消耗: number;
-          突袭模式: boolean;
-      };
-      胜率预估?: number;
+    可执行: boolean;
+    原因?: string;
+    目标?: {
+      名称: string;
+      战斗力: number;
+    };
+    我方?: {
+      总战斗力: number;
+      将领数量: number;
+      行动力消耗: number;
+      突袭模式: boolean;
+    };
+    胜率预估?: number;
   } {
-      if (!this.选定目标) {
-          return { 可执行: false, 原因: '未选择目标地点' };
-      }
+    if (!this.选定目标) {
+      return { 可执行: false, 原因: '未选择目标地点' };
+    }
 
-      if (this.当前部署.size === 0) {
-          return { 可执行: false, 原因: '未部署任何将领' };
-      }
+    if (this.当前部署.size === 0) {
+      return { 可执行: false, 原因: '未部署任何将领' };
+    }
 
-      const 敌方战斗力估值 = this.选定目标.获取战斗力估值();
-      if (敌方战斗力估值 === null) {
-          return { 可执行: false, 原因: '目标地点未侦查' };
-      }
-      const 我方战斗力 = this.计算总战斗力();
+    const 敌方战斗力估值 = this.选定目标.获取战斗力估值();
+    if (敌方战斗力估值 === null) {
+      return { 可执行: false, 原因: '目标地点未侦查' };
+    }
+    const 我方战斗力 = this.计算总战斗力();
 
-      // 简单胜率计算
-      const 胜率 = this.计算胜率(我方战斗力, 敌方战斗力估值, this.选定目标);
+    // 简单胜率计算
+    const 胜率 = this.计算胜率(我方战斗力, 敌方战斗力估值, this.选定目标);
 
-      return {
-          可执行: true,
-          目标: {
-              名称: this.选定目标.地点名称,
-              战斗力: 敌方战斗力估值,
-          },
-          我方: {
-              总战斗力: 我方战斗力,
-              将领数量: this.当前部署.size,
-              行动力消耗: this.计算行动力消耗(),
-              突袭模式: this.突袭模式,
-          },
-          胜率预估: 胜率,
-      };
+    return {
+      可执行: true,
+      目标: {
+        名称: this.选定目标.地点名称,
+        战斗力: 敌方战斗力估值,
+      },
+      我方: {
+        总战斗力: 我方战斗力,
+        将领数量: this.当前部署.size,
+        行动力消耗: this.计算行动力消耗(),
+        突袭模式: this.突袭模式,
+      },
+      胜率预估: 胜率,
+    };
   }
 
   // ─── 执行战斗 ───
 
   确认战斗(): {
-      成功: boolean;
-      原因?: string;
-  }{
-      const 战斗预览 = this.获取战斗预览()
-      if (!战斗预览.可执行) {
-          return {
-              成功: false,
-              原因: 战斗预览.原因,
-          };
-      } else { 
-          this.是否战斗 = true;
-          return {
-              成功: true,
-              原因: 战斗预览.原因,
-          };;
-      }
+    成功: boolean;
+    原因?: string;
+  } {
+    const 战斗预览 = this.获取战斗预览()
+    if (!战斗预览.可执行) {
+      return {
+        成功: false,
+        原因: 战斗预览.原因,
+      };
+    } else {
+      this.是否战斗 = true;
+      return {
+        成功: true,
+        原因: 战斗预览.原因,
+      };;
+    }
   }
 
   取消确认(): void {
-      this.是否战斗 = false;
+    this.是否战斗 = false;
   }
 
   执行战斗(): 战斗结果 {
-      // 预检
-      const 预览 = this.获取战斗预览();
-      if (!预览.可执行) {
-          return {
-              成功: false,
-              胜利: false,
-              原因: 预览.原因,
-              我方战斗力: 0,
-              敌方战斗力: 0,
-          };
-      }
-
-      const 目标 = this.选定目标!;
-      const 敌方战斗力 = 目标.获取属性('战斗力') as number;
-      const 我方战斗力 = this.计算总战斗力();
-
-      // 战斗判定
-      const 战力比 = 我方战斗力 / (敌方战斗力 + 1);
-      const 胜率 = this.计算胜率(我方战斗力, 敌方战斗力, 目标); // 计算胜率
-
-      const 胜利 = Math.random() < 胜率;
-
-      // 战损计算
-      let 战损比例 = 0;
-      if (胜利) {
-          战损比例 = Math.max(0, Math.min(0.6, (2 - 战力比) * 0.4));
-      } else {
-          战损比例 = Math.min(0.8, (1 / 战力比) * 0.4);
-      }
-
-      // 应用战损到各喽啰池
-      for (const 部署 of this.当前部署.values()) {
-          const 池 = 部署.喽啰池;
-          const 分组列表 = 池.获取分组详情();
-
-          for (const 分组 of 分组列表) {
-              const 损失 = Math.floor(分组.数量 * 战损比例);
-              if (损失 > 0) {
-                  池.减少喽啰(损失, 分组.等级);
-              }
-          }
-      }
-
-      // 胜利奖励
-      const 俘获母畜: string[] = [];
-      if (胜利) {
-          // 获取已侦察的母畜
-          const 已侦察母畜 = 目标.获取所有已侦察母畜();
-          for (const 母畜 of 已侦察母畜) {
-              俘获母畜.push(母畜.实体ID);
-              目标.移除已捕获母畜(母畜);
-          }
-      }
-
-      // 清理状态
-      this.清空出战列表();
-
+    // 预检
+    const 预览 = this.获取战斗预览();
+    if (!预览.可执行) {
       return {
-          成功: true,
-          胜利,
-          我方战斗力,
-          敌方战斗力,
-          战损比例,
-          俘获母畜: 胜利 ? 俘获母畜 : undefined,
+        成功: false,
+        胜利: false,
+        原因: 预览.原因,
+        我方战斗力: 0,
+        敌方战斗力: 0,
       };
+    }
+
+    const 目标 = this.选定目标!;
+    const 敌方战斗力 = 目标.获取属性('战斗力') as number;
+    const 我方战斗力 = this.计算总战斗力();
+
+    // 战斗判定
+    const 战力比 = 我方战斗力 / (敌方战斗力 + 1);
+    const 胜率 = this.计算胜率(我方战斗力, 敌方战斗力, 目标); // 计算胜率
+
+    const 胜利 = Math.random() < 胜率;
+
+    // 战损计算
+    let 战损比例 = 0;
+    if (胜利) {
+      战损比例 = Math.max(0, Math.min(0.6, (2 - 战力比) * 0.4));
+    } else {
+      战损比例 = Math.min(0.8, (1 / 战力比) * 0.4);
+    }
+
+    // 应用战损到各喽啰池
+    for (const 部署 of this.当前部署.values()) {
+      const 池 = 部署.喽啰池;
+      const 分组列表 = 池.获取分组详情();
+
+      for (const 分组 of 分组列表) {
+        const 损失 = Math.floor(分组.数量 * 战损比例);
+        if (损失 > 0) {
+          池.减少喽啰(损失, 分组.等级);
+        }
+      }
+    }
+
+    // 胜利奖励
+    const 俘获母畜: string[] = [];
+    if (胜利) {
+      // 获取已侦察的母畜
+      const 已侦察母畜 = 目标.获取所有已侦察母畜();
+      for (const 母畜 of 已侦察母畜) {
+        俘获母畜.push(母畜.实体ID);
+        目标.移除已捕获母畜(母畜);
+      }
+    }
+
+    // 清理状态
+    this.清空出战列表();
+
+    return {
+      成功: true,
+      胜利,
+      我方战斗力,
+      敌方战斗力,
+      战损比例,
+      俘获母畜: 胜利 ? 俘获母畜 : undefined,
+    };
   }
 
   // ─── 重置 ───
 
   回合重置(): void {
-      this.清空出战列表();
-      this.选定目标 = null;
-      this.突袭模式 = false;
+    this.清空出战列表();
+    this.选定目标 = null;
+    this.突袭模式 = false;
   }
 }
 
@@ -1477,7 +1507,7 @@ class 回合管理器 {
     this.已经初始化 = false;
   }
 
-  初始化(任务管理: 任务管理器, 法术管理: 法术管理器, 黑市管理: 黑市管理器, 战斗管理: 战斗管理器,资源管理:资源管理器):void {
+  初始化(任务管理: 任务管理器, 法术管理: 法术管理器, 黑市管理: 黑市管理器, 战斗管理: 战斗管理器, 资源管理: 资源管理器): void {
     this.当前回合 = 0;
     this.任务管理器 = 任务管理;
     this.法术管理器 = 法术管理;
@@ -1489,6 +1519,9 @@ class 回合管理器 {
 
   获取当前回合(): number {
     return this.当前回合;
+  }
+  设置当前回合(回合数: number): void {
+    this.当前回合 = Math.max(0, Math.floor(回合数));
   }
 
   结束回合(): 回合结算摘要 {
@@ -1503,7 +1536,7 @@ class 回合管理器 {
 
     let 战斗结果 = null;
 
-    if(this.战斗管理器.是否战斗){
+    if (this.战斗管理器.是否战斗) {
       战斗结果 = this.战斗管理器.执行战斗();
     }
 

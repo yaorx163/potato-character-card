@@ -1,12 +1,13 @@
-import { createApp } from 'vue'
-import './style.css'
-import App from './App.vue'
+// main.ts
+import { createApp } from 'vue';
+import { createPinia } from 'pinia';
+import App from './App.vue';
 
-// 创建Vue应用实例
-const app = createApp(App)
+// 导入全局样式
+import './styles/dark-fantasy.scss';
 
-// 挂载到DOM
-app.mount('#app')
+const app = createApp(App);
+const pinia = createPinia();
 
-// 导出app实例（可选，用于测试或模块联邦等）
-export { app }
+app.use(pinia);
+app.mount('#app');

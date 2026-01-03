@@ -1,3 +1,7 @@
+// ═══════════════════════════════════════════════════════════════
+// types/managers.ts
+// 管理器类型定义
+// ═══════════════════════════════════════════════════════════════
 import type { 武装等级 } from "@/types/index";
 import type { 冠军实体, 喽啰池实体, 可袭击地点实体 } from "@/core/entities";
 import type { 任务管理器 } from "@/core/managers";
