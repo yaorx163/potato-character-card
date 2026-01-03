@@ -1,1029 +1,509 @@
 <!-- components/panels/MarketPanel.vue -->
+<!-- 介绍：黑市面板 - 改进版，支持购买时选择目标 -->
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { useGameStore } from '../../stores/gameStore';
+import { ref, computed, watch } from 'vue'
+import { useGameStore } from '@/stores/gameStore'
 
-const store = useGameStore();
+const store = useGameStore()
 
-type TabType = 'goods' | 'slaves';
-const currentTab = ref<TabType>('goods');
+type MarketTab = 'goods' | 'slaves'
+const activeTab = ref<MarketTab>('goods')
 
-// 商品列表
-const 商品列表 = computed(() => {
-  return store.游戏实例?.获取黑市管理器().获取所有商品名() ?? [];
-});
+// 目标选择状态
+const selectingTargetFor = ref<string | null>(null) // 商品名或奴隶ID
+const selectedTarget = ref<string | null>(null)
 
-// 奴隶列表
-const 奴隶列表 = computed(() => {
-  return store.游戏实例?.获取黑市管理器().获取奴隶货架() ?? [];
-});
+const marketManager = computed(() => store.游戏实例?.获取黑市管理器())
 
-// 购买状态
-const 选中商品 = ref<string | null>(null);
-const 购买数量 = ref(1);
-const 选中目标ID = ref<string | null>(null);
-const 选中奴隶ID = ref<string | null>(null);
+interface GoodsConfig {
+  价格?: number
+  描述?: string
+  需要目标?: boolean
+  目标类型?: string[]
+  每回合限购?: number
+}
 
-// 当前商品配置
-const 当前商品配置 = computed(() => {
-  if (!选中商品.value) return null;
-  return store.游戏实例?.获取黑市管理器().获取商品配置(选中商品.value) ?? null;
-});
+const allGoods = computed(() =>
+  marketManager.value?.获取所有商品名().map(name => {
+    const config = marketManager.value?.获取商品配置(name) as GoodsConfig | undefined
+    return {
+      name,
+      config,
+      remaining: marketManager.value?.获取商品可购买数量(name) ?? 0,
+      needsTarget: config?.需要目标 ?? false
+    }
+  }) ?? []
+)
 
-// 计算总价
-const 总价格 = computed(() => {
-  if (!当前商品配置.value) return 0;
-  return 当前商品配置.value.价格 * 购买数量.value;
-});
+const slaves = computed(() =>
+  marketManager.value?.获取奴隶货架() ?? []
+)
 
-// 是否需要目标
-const 需要目标 = computed(() => {
-  if (!当前商品配置.value) return false;
-  return 当前商品配置.value.目标类型 !== '无';
-});
+const currentMilk = computed(() => store.资源状态.催淫母乳)
 
-// 目标选项
-const 目标选项 = computed(() => {
-  if (!当前商品配置.value) return [];
+// 获取可选目标列表
+const availableTargets = computed(() => {
+  if (!selectingTargetFor.value) return []
 
-  const 目标类型 = 当前商品配置.value.目标类型;
+  // 尝试获取商品配置
+  const goods = allGoods.value.find(g => g.name === selectingTargetFor.value)
+  const targetTypes = goods?.config?.目标类型 ?? ['母畜实体', '冠军实体']
 
-  switch (目标类型) {
-    case '母畜实体':
-      return store.所有母畜.map(b => ({
-        id: b.实体ID,
-        名称: b.获取属性('姓名'),
-        描述: `${b.获取属性('种族')}`,
-        图标: '👩'
-      }));
-    case '冠军实体':
-      return store.所有冠军.map(c => ({
+  const result: { id: string; name: string; type: string; info?: string }[] = []
+
+  if (targetTypes.includes('母畜实体')) {
+    store.所有母畜.forEach(m => {
+      result.push({
+        id: m.实体ID,
+        name: m.获取属性('姓名'),
+        type: '母畜',
+        info: `臣服度: ${m.获取属性('臣服度')}`
+      })
+    })
+  }
+
+  if (targetTypes.includes('冠军实体')) {
+    store.所有冠军.forEach(c => {
+      result.push({
         id: c.实体ID,
-        名称: c.获取属性('姓名'),
-        描述: `喽啰 ${c.获取喽啰池()?.获取总数量() ?? 0}`,
-        图标: '👺'
-      }));
-    default:
-      return [];
+        name: c.获取属性('姓名'),
+        type: '冠军'
+      })
+    })
   }
-});
 
-// 是否可以购买商品
-const 可以购买商品 = computed(() => {
-  if (!选中商品.value || !当前商品配置.value) return false;
-  if (总价格.value > store.资源状态.催淫母乳) return false;
-  if (需要目标.value && !选中目标ID.value) return false;
-  return true;
-});
+  if (targetTypes.includes('地点实体')) {
+    store.所有地点.forEach(l => {
+      result.push({
+        id: l.实体ID,
+        name: l.地点名称,
+        type: '地点'
+      })
+    })
+  }
 
-// 选中的奴隶详情
-const 选中的奴隶 = computed(() => {
-  if (!选中奴隶ID.value) return null;
-  return 奴隶列表.value.find(s => s.商品ID === 选中奴隶ID.value);
-});
+  return result
+})
 
-// 是否可以购买奴隶
-const 可以购买奴隶 = computed(() => {
-  if (!选中的奴隶.value) return false;
-  return 选中的奴隶.value.价格 <= store.资源状态.催淫母乳;
-});
-
-// 方法
-function 选择商品(商品名: string) {
-  选中商品.value = 商品名;
-  购买数量.value = 1;
-  选中目标ID.value = null;
-}
-
-function 增加数量() {
-  const 新总价 = 总价格.value + (当前商品配置.value?.价格 ?? 0);
-  if (新总价 <= store.资源状态.催淫母乳) {
-    购买数量.value++;
+// 检查商品是否需要目标
+function checkAndBuyGoods(goodsName: string) {
+  const goods = allGoods.value.find(g => g.name === goodsName)
+  if (goods?.needsTarget) {
+    selectingTargetFor.value = goodsName
+    selectedTarget.value = null
+  } else {
+    store.购买商品(goodsName, 1)
   }
 }
 
-function 减少数量() {
-  if (购买数量.value > 1) {
-    购买数量.value--;
-  }
+// 确认购买（带目标）
+function confirmPurchase() {
+  if (!selectingTargetFor.value) return
+
+  // gameStore方法：购买商品并指定目标
+  store.购买商品(selectingTargetFor.value, 1, selectedTarget.value ?? undefined)
+
+  selectingTargetFor.value = null
+  selectedTarget.value = null
 }
 
-function 购买商品() {
-  if (!可以购买商品.value || !选中商品.value) return;
-
-  const 结果 = store.购买商品(选中商品.value, 购买数量.value, 选中目标ID.value ?? undefined);
-
-  if (结果.成功) {
-    选中商品.value = null;
-    购买数量.value = 1;
-    选中目标ID.value = null;
-  }
+// 取消选择
+function cancelSelection() {
+  selectingTargetFor.value = null
+  selectedTarget.value = null
 }
 
-function 购买奴隶() {
-  if (!可以购买奴隶.value || !选中奴隶ID.value) return;
-
-  const 结果 = store.购买奴隶(选中奴隶ID.value);
-
-  if (结果.成功) {
-    选中奴隶ID.value = null;
-  }
-}
-
-// 获取商品图标
-function 获取商品图标(类型: string): string {
-  const 图标映射: Record<string, string> = {
-    '消耗品': '🧪',
-    '装备': '⚔️',
-    '道具': '📦',
-    '材料': '🔮',
-  };
-  return 图标映射[类型] ?? '📦';
-}
-
-// 获取稀有度颜色
-function 获取稀有度颜色(稀有度: string): string {
-  const 颜色映射: Record<string, string> = {
-    '普通': 'primary',
-    '稀有': 'accent',
-    '史诗': 'warning',
-    '传说': 'danger',
-  };
-  return 颜色映射[稀有度] ?? 'primary';
+function buySlave(slaveId: string) {
+  store.购买奴隶(slaveId)
 }
 </script>
 
 <template>
   <div class="market-panel">
-    <div class="panel panel--elevated">
-      <div class="panel__header">
-        <h2 class="panel__title">黑市交易</h2>
-        <div class="currency-display">
-          <span class="currency-icon">🍼</span>
-          <span class="currency-value">{{ store.资源状态.催淫母乳 }}</span>
-          <span class="currency-label">催淫母乳</span>
-        </div>
-      </div>
+    <!-- 当前资源 -->
+    <div class="resource-display">
+      <span class="resource-icon">✦</span>
+      <span class="resource-label">催淫母乳:</span>
+      <span class="resource-value">{{ currentMilk }}</span>
+    </div>
 
-      <!-- 标签切换 -->
-      <div class="tab-nav">
-        <button
-          class="tab-btn"
-          :class="{ 'tab-btn--active': currentTab === 'goods' }"
-          @click="currentTab = 'goods'; 选中奴隶ID = null"
-        >
-          <span class="tab-btn__icon">📦</span>
-          <span class="tab-btn__label">商品</span>
-          <span class="tab-btn__count">{{ 商品列表.length }}</span>
-        </button>
-        <button
-          class="tab-btn"
-          :class="{ 'tab-btn--active': currentTab === 'slaves' }"
-          @click="currentTab = 'slaves'; 选中商品 = null"
-        >
-          <span class="tab-btn__icon">👩</span>
-          <span class="tab-btn__label">奴隶</span>
-          <span class="tab-btn__count">{{ 奴隶列表.length }}</span>
-        </button>
-      </div>
-
-      <div class="market-layout">
-        <!-- 商品/奴隶列表 -->
-        <div class="list-section">
-          <Transition name="fade" mode="out-in">
-            <!-- 商品列表 -->
-            <div v-if="currentTab === 'goods'" key="goods" class="goods-grid">
-              <div
-                v-for="商品名 in 商品列表"
-                :key="商品名"
-                class="goods-card"
-                :class="{ 'goods-card--selected': 选中商品 === 商品名 }"
-                @click="选择商品(商品名)"
-              >
-                <div class="goods-card__icon">
-                  {{ 获取商品图标(store.游戏实例?.获取黑市管理器().获取商品配置(商品名)?.类型 ?? '') }}
-                </div>
-                <div class="goods-card__info">
-                  <h4 class="goods-name">{{ 商品名 }}</h4>
-                  <p class="goods-desc">
-                    {{ store.游戏实例?.获取黑市管理器().获取商品配置(商品名)?.描述 }}
-                  </p>
-                </div>
-                <div class="goods-card__price">
-                  <span class="price-icon">🍼</span>
-                  <span class="price-value">
-                    {{ store.游戏实例?.获取黑市管理器().获取商品配置(商品名)?.价格 }}
-                  </span>
-                </div>
-              </div>
-
-              <div v-if="商品列表.length === 0" class="empty-state">
-                <span class="empty-icon">📦</span>
-                <p>暂无商品</p>
-              </div>
-            </div>
-
-            <!-- 奴隶列表 -->
-            <div v-else-if="currentTab === 'slaves'" key="slaves" class="slaves-grid">
-              <div
-                v-for="slave in 奴隶列表"
-                :key="slave.商品ID"
-                class="slave-card"
-                :class="{
-                  'slave-card--selected': 选中奴隶ID === slave.商品ID,
-                  'slave-card--unaffordable': slave.价格 > store.资源状态.催淫母乳
-                }"
-                @click="选中奴隶ID = slave.商品ID"
-              >
-                <div class="slave-card__avatar">👩</div>
-                <div class="slave-card__info">
-                  <h4 class="slave-name">{{ slave.母畜实体.获取属性('姓名') }}</h4>
-                  <div class="slave-tags">
-                    <span class="tag tag--race">{{ slave.母畜实体.获取属性('种族') }}</span>
-                    <span class="tag tag--identity">{{ slave.母畜实体.获取属性('原身份') }}</span>
-                  </div>
-                  <div class="slave-stats">
-                    <span class="stat">魅力 {{ slave.母畜实体.获取属性('魅力') }}</span>
-                    <span class="stat">生育力 {{ slave.母畜实体.获取属性('生育力') }}</span>
-                    <span class="stat">年龄 {{ slave.母畜实体.获取属性('年龄') }}</span>
-                  </div>
-                </div>
-                <div class="slave-card__price">
-                  <span class="price-icon">🍼</span>
-                  <span class="price-value">{{ slave.母畜实体.获取属性('价格') }}</span>
-                </div>
-              </div>
-
-              <div v-if="奴隶列表.length === 0" class="empty-state">
-                <span class="empty-icon">👩</span>
-                <p>暂无待售奴隶</p>
-                <p class="empty-hint">每回合刷新</p>
-              </div>
-            </div>
-          </Transition>
+    <!-- 目标选择弹层 -->
+    <div v-if="selectingTargetFor" class="target-selection-overlay">
+      <div class="target-selection-modal">
+        <div class="modal-header">
+          <h4>选择使用目标</h4>
+          <span class="modal-subtitle">{{ selectingTargetFor }}</span>
         </div>
 
-        <!-- 购买配置 -->
-        <div class="purchase-section">
-          <!-- 商品购买配置 -->
-          <div v-if="currentTab === 'goods' && 选中商品 && 当前商品配置" class="purchase-config">
-            <div class="config-header">
-              <span class="config-icon">{{ 获取商品图标(当前商品配置.类型) }}</span>
-              <div class="config-title">
-                <h3>{{ 选中商品 }}</h3>
-                <span class="config-type">{{ 当前商品配置.类型 }}</span>
-              </div>
+        <div class="target-list">
+          <button
+            v-for="target in availableTargets"
+            :key="target.id"
+            class="target-option"
+            :class="{ 'target-option--selected': selectedTarget === target.id }"
+            @click="selectedTarget = target.id"
+          >
+            <div class="target-main">
+              <span class="target-type">[{{ target.type }}]</span>
+              <span class="target-name">{{ target.name }}</span>
             </div>
-
-            <p class="config-desc">{{ 当前商品配置.描述 }}</p>
-
-            <!-- 数量控制 -->
-            <div class="quantity-control">
-              <h4>购买数量</h4>
-              <div class="quantity-input">
-                <button class="quantity-btn" @click="减少数量" :disabled="购买数量 <= 1">−</button>
-                <span class="quantity-value">{{ 购买数量 }}</span>
-                <button class="quantity-btn" @click="增加数量" :disabled="总价格 + 当前商品配置.价格 > store.资源状态.催淫母乳">+</button>
-              </div>
-            </div>
-
-            <!-- 目标选择 -->
-            <div class="target-select" v-if="需要目标">
-              <h4>选择目标</h4>
-              <div class="target-list">
-                <div
-                  v-for="target in 目标选项"
-                  :key="target.id"
-                  class="target-item"
-                  :class="{ 'target-item--selected': 选中目标ID === target.id }"
-                  @click="选中目标ID = target.id"
-                >
-                  <span class="target-icon">{{ target.图标 }}</span>
-                  <span class="target-name">{{ target.名称 }}</span>
-                  <span class="target-desc">{{ target.描述 }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- 总价和购买 -->
-            <div class="purchase-footer">
-              <div class="total-price">
-                <span class="total-label">总价:</span>
-                <span class="total-value" :class="{ 'total-value--insufficient': 总价格 > store.资源状态.催淫母乳 }">
-                  <span class="price-icon">🍼</span>
-                  {{ 总价格 }}
-                </span>
-              </div>
-              <button
-                class="btn btn--accent btn--lg btn--block"
-                :disabled="!可以购买商品"
-                @click="购买商品"
-              >
-                确认购买
-              </button>
-            </div>
+            <span v-if="target.info" class="target-info">{{ target.info }}</span>
+          </button>
+          <div v-if="availableTargets.length === 0" class="no-target">
+            无可用目标
           </div>
+        </div>
 
-          <!-- 奴隶购买配置 -->
-          <div v-else-if="currentTab === 'slaves' && 选中的奴隶" class="purchase-config">
-            <div class="slave-detail">
-              <div class="slave-portrait">👩</div>
-              <h3 class="slave-detail-name">{{ 选中的奴隶.母畜实体.获取属性('姓名') }}</h3>
-              <div class="slave-detail-tags">
-                <span class="tag tag--race">{{ 选中的奴隶.母畜实体.获取属性('种族') }}</span>
-                <span class="tag tag--identity">{{ 选中的奴隶.母畜实体.获取属性('原身份') }}</span>
-              </div>
-            </div>
+        <div class="modal-actions">
+          <button class="btn" @click="cancelSelection">取消</button>
+          <button
+            class="btn btn--primary"
+            @click="confirmPurchase"
+            :disabled="!selectedTarget"
+          >
+            确认购买
+          </button>
+        </div>
+      </div>
+    </div>
 
-            <div class="slave-attributes">
-              <div class="attr-row">
-                <span class="attr-label">年龄</span>
-                <span class="attr-value">{{ 选中的奴隶.母畜实体.获取属性('年龄') }}岁</span>
-              </div>
-              <div class="attr-row">
-                <span class="attr-label">魅力</span>
-                <div class="attr-bar">
-                  <div class="attr-fill" :style="{ width: `${选中的奴隶.母畜实体.获取属性('魅力') }%` }"></div>
-                </div>
-                <span class="attr-value">{{ 选中的奴隶.母畜实体.获取属性('魅力') }}</span>
-              </div>
-              <div class="attr-row">
-                <span class="attr-label">生育力</span>
-                <div class="attr-bar">
-                  <div class="attr-fill attr-fill--accent" :style="{ width: `${选中的奴隶.母畜实体.获取属性('生育力') }%` }"></div>
-                </div>
-                <span class="attr-value">{{ 选中的奴隶.母畜实体.获取属性('生育力') }}</span>
-              </div>
-              <div class="attr-row" v-if="选中的奴隶.母畜实体.特性列表.size > 0">
-                <span class="attr-label">特性列表</span>
-                <span class="attr-value attr-value--special">{{ 选中的奴隶.母畜实体.特性列表 }}</span>
-              </div>
-            </div>
+    <!-- 子标签 -->
+    <div class="market-tabs">
+      <button
+        class="market-tab"
+        :class="{ 'market-tab--active': activeTab === 'goods' }"
+        @click="activeTab = 'goods'"
+      >
+        常驻商品
+      </button>
+      <button
+        class="market-tab"
+        :class="{ 'market-tab--active': activeTab === 'slaves' }"
+        @click="activeTab = 'slaves'"
+      >
+        奴隶 ({{ slaves.length }})
+      </button>
+    </div>
 
-            <div class="purchase-footer">
-              <div class="total-price">
-                <span class="total-label">价格:</span>
-                <span class="total-value" :class="{ 'total-value--insufficient': 选中的奴隶.价格 > store.资源状态.催淫母乳 }">
-                  <span class="price-icon">🍼</span>
-                  {{ 选中的奴隶.价格 }}
-                </span>
-              </div>
-              <button
-                class="btn btn--accent btn--lg btn--block"
-                :disabled="!可以购买奴隶"
-                @click="购买奴隶"
-              >
-                购买奴隶
-              </button>
-            </div>
+    <!-- 商品列表 -->
+    <div v-if="activeTab === 'goods'" class="goods-list">
+      <div
+        v-for="goods in allGoods"
+        :key="goods.name"
+        class="goods-item"
+      >
+        <div class="goods-item__info">
+          <div class="goods-header">
+            <span class="goods-name">{{ goods.name }}</span>
+            <span v-if="goods.needsTarget" class="needs-target-badge">需目标</span>
           </div>
+          <span class="goods-desc">{{ goods.config?.描述 }}</span>
+          <span class="goods-meta">
+            价格: {{ goods.config?.价格 }} · 剩余: {{ goods.remaining === Infinity ? '∞' : goods.remaining }}
+          </span>
+        </div>
+        <button
+          class="btn btn--small"
+          :disabled="currentMilk < (goods.config?.价格 ?? 0) || goods.remaining <= 0"
+          @click="checkAndBuyGoods(goods.name)"
+        >
+          {{ goods.needsTarget ? '选择目标' : '购买' }}
+        </button>
+      </div>
+    </div>
 
-          <!-- 空状态 -->
-          <div v-else class="empty-purchase">
-            <span class="empty-icon">🛒</span>
-            <p>选择商品或奴隶查看详情</p>
-          </div>
+    <!-- 奴隶列表 -->
+    <div v-else class="slave-list">
+      <div v-if="slaves.length === 0" class="empty-hint">
+        本周无奴隶出售
+      </div>
+
+      <div
+        v-for="slave in slaves"
+        :key="slave.商品ID"
+        class="slave-item"
+      >
+        <div class="slave-item__info">
+          <span class="slave-name">{{ slave.母畜实体.获取属性('姓名') }}</span>
+          <span class="slave-detail">
+            {{ slave.母畜实体.获取属性('种族') }} ·
+            {{ slave.母畜实体.获取属性('原身份') }}
+          </span>
+          <span class="slave-stats">
+            育力: {{ slave.母畜实体.获取属性('总生育力') }} ·
+            魅力: {{ slave.母畜实体.获取属性('魅力') }}
+          </span>
+        </div>
+        <div class="slave-item__action">
+          <span class="slave-price">✦ {{ slave.价格 }}</span>
+          <button
+            class="btn btn--small btn--primary"
+            :disabled="currentMilk < slave.价格"
+            @click="buySlave(slave.商品ID)"
+          >
+            购买
+          </button>
         </div>
       </div>
     </div>
   </div>
 </template>
 
-<style scoped lang="scss">
-@use '../../styles/variables' as *;
-
+<style lang="scss" scoped>
 .market-panel {
-  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
 }
 
-.currency-display {
+.resource-display {
   display: flex;
   align-items: center;
-  gap: $spacing-sm;
-  padding: $spacing-sm $spacing-lg;
-  background: rgba($color-primary, 0.15);
-  border: 1px solid $color-primary;
-  border-radius: $radius-sm;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
 
-  .currency-icon {
-    font-size: $font-size-xl;
+  .resource-icon {
+    color: var(--accent-corrupt);
   }
 
-  .currency-value {
-    font-size: $font-size-xl;
-    font-weight: 700;
-    color: $color-primary-light;
+  .resource-label {
+    font-size: 13px;
+    color: var(--text-secondary);
   }
 
-  .currency-label {
-    font-size: $font-size-sm;
-    color: $text-muted;
+  .resource-value {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--accent-corrupt);
   }
 }
 
-.tab-nav {
-  display: flex;
-  gap: $spacing-sm;
-  padding: 0 $spacing-lg;
-  margin-bottom: $spacing-lg;
-}
-
-.tab-btn {
+/* 目标选择弹层 */
+.target-selection-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
-  gap: $spacing-sm;
-  padding: $spacing-sm $spacing-lg;
-  background: transparent;
-  border: 1px solid $border-medium;
-  border-radius: $radius-sm;
-  color: $text-secondary;
-  cursor: pointer;
-  transition: all $transition-fast;
-  font-family: $font-family-ui;
+  justify-content: center;
+  z-index: 100;
+  border-radius: 3px;
+}
 
-  &:hover {
-    border-color: $color-primary;
-    color: $text-primary;
-  }
+.target-selection-modal {
+  width: 90%;
+  max-width: 300px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  overflow: hidden;
+}
 
-  &--active {
-    background: rgba($color-primary, 0.15);
-    border-color: $color-primary;
-    color: $text-highlight;
-  }
+.modal-header {
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-dark);
 
-  &__icon {
-    font-size: $font-size-lg;
-  }
-
-  &__label {
-    font-size: $font-size-sm;
+  h4 {
+    font-size: 14px;
     font-weight: 500;
+    color: var(--text-primary);
+    margin: 0;
   }
 
-  &__count {
-    min-width: 24px;
-    height: 24px;
-    padding: 0 $spacing-sm;
-    background: $bg-light;
-    border-radius: 12px;
-    font-size: $font-size-xs;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-}
-
-.market-layout {
-  display: grid;
-  grid-template-columns: 1fr 380px;
-  gap: $spacing-lg;
-  padding: 0 $spacing-lg $spacing-lg;
-
-  @media (max-width: 1200px) {
-    grid-template-columns: 1fr;
-  }
-}
-
-.list-section {
-  max-height: calc(100vh - 320px);
-  overflow-y: auto;
-}
-
-// 商品网格
-.goods-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: $spacing-md;
-}
-
-.goods-card {
-  display: flex;
-  align-items: flex-start;
-  gap: $spacing-md;
-  padding: $spacing-lg;
-  background: $bg-medium;
-  border: 1px solid $border-medium;
-  border-radius: $radius-md;
-  cursor: pointer;
-  transition: all $transition-fast;
-
-  &:hover {
-    border-color: $color-primary;
-  }
-
-  &--selected {
-    border-color: $color-accent;
-    background: rgba($color-accent, 0.1);
-  }
-
-  &__icon {
-    width: 48px;
-    height: 48px;
-    background: $bg-light;
-    border: 2px solid $border-light;
-    border-radius: $radius-md;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: $font-size-2xl;
-    flex-shrink: 0;
-  }
-
-  &__info {
-    flex: 1;
-    min-width: 0;
-  }
-
-  &__price {
-    display: flex;
-    align-items: center;
-    gap: $spacing-xs;
-    padding: $spacing-xs $spacing-sm;
-    background: $bg-light;
-    border-radius: $radius-sm;
-
-    .price-icon {
-      font-size: $font-size-sm;
-    }
-
-    .price-value {
-      font-weight: 600;
-      color: $color-primary-light;
-    }
-  }
-}
-
-.goods-name {
-  font-size: $font-size-base;
-  font-weight: 600;
-  color: $text-highlight;
-  margin: 0 0 $spacing-xs;
-}
-
-.goods-desc {
-  font-size: $font-size-sm;
-  color: $text-secondary;
-  margin: 0;
-}
-
-// 奴隶网格
-.slaves-grid {
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-md;
-}
-
-.slave-card {
-  display: flex;
-  align-items: center;
-  gap: $spacing-md;
-  padding: $spacing-lg;
-  background: $bg-medium;
-  border: 1px solid $border-medium;
-  border-radius: $radius-md;
-  cursor: pointer;
-  transition: all $transition-fast;
-
-  &:hover {
-    border-color: $color-primary;
-  }
-
-  &--selected {
-    border-color: $color-accent;
-    background: rgba($color-accent, 0.1);
-  }
-
-  &--unaffordable {
-    opacity: 0.6;
-  }
-
-  &__avatar {
-    width: 56px;
-    height: 56px;
-    background: linear-gradient(135deg, #ffd1dc 0%, #ffb6c1 100%);
-    border: 2px solid $border-light;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: $font-size-2xl;
-    flex-shrink: 0;
-  }
-
-  &__info {
-    flex: 1;
-    min-width: 0;
-  }
-
-  &__price {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: $spacing-xs;
-    padding: $spacing-sm $spacing-md;
-    background: $bg-light;
-    border-radius: $radius-sm;
-
-    .price-icon {
-      font-size: $font-size-lg;
-    }
-
-    .price-value {
-      font-size: $font-size-lg;
-      font-weight: 700;
-      color: $color-primary-light;
-    }
-  }
-}
-
-.slave-name {
-  font-size: $font-size-base;
-  font-weight: 600;
-  color: $text-highlight;
-  margin: 0 0 $spacing-xs;
-}
-
-.slave-tags {
-  display: flex;
-  gap: $spacing-xs;
-  margin-bottom: $spacing-sm;
-}
-
-.tag {
-  padding: 2px $spacing-sm;
-  border-radius: $radius-sm;
-  font-size: $font-size-xs;
-
-  &--race {
-    background: rgba($color-info, 0.2);
-    color: lighten($color-info, 20%);
-  }
-
-  &--identity {
-    background: rgba($color-primary, 0.2);
-    color: $color-primary-light;
-  }
-}
-
-.slave-stats {
-  display: flex;
-  gap: $spacing-md;
-  font-size: $font-size-sm;
-  color: $text-muted;
-
-  .stat {
-    &::after {
-      content: '·';
-      margin-left: $spacing-md;
-      color: $border-light;
-    }
-
-    &:last-child::after {
-      display: none;
-    }
-  }
-}
-
-// 购买配置区
-.purchase-section {
-  background: $bg-medium;
-  border: 1px solid $border-dark;
-  border-radius: $radius-md;
-  padding: $spacing-lg;
-  max-height: calc(100vh - 320px);
-  overflow-y: auto;
-}
-
-.purchase-config {
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-lg;
-}
-
-.config-header {
-  display: flex;
-  align-items: center;
-  gap: $spacing-md;
-}
-
-.config-icon {
-  width: 56px;
-  height: 56px;
-  background: linear-gradient(135deg, $color-accent-dark, $color-accent);
-  border-radius: $radius-md;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: $font-size-2xl;
-}
-
-.config-title {
-  h3 {
-    font-size: $font-size-xl;
-    font-weight: 700;
-    color: $text-highlight;
-    margin: 0 0 $spacing-xs;
-  }
-
-  .config-type {
-    font-size: $font-size-sm;
-    color: $text-muted;
-  }
-}
-
-.config-desc {
-  font-size: $font-size-base;
-  color: $text-secondary;
-  line-height: $line-height-loose;
-  margin: 0;
-}
-
-.effect-preview {
-  padding: $spacing-md;
-  background: rgba($color-success, 0.1);
-  border: 1px solid $color-success;
-  border-radius: $radius-sm;
-
-  h4 {
-    font-size: $font-size-sm;
-    color: $text-muted;
-    margin: 0 0 $spacing-sm;
-  }
-}
-
-.effect-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: $spacing-sm;
-}
-
-.effect-item {
-  display: flex;
-  align-items: center;
-  gap: $spacing-xs;
-  padding: $spacing-xs $spacing-sm;
-  background: $bg-dark;
-  border-radius: $radius-sm;
-
-  .effect-name {
-    font-size: $font-size-sm;
-    color: $text-secondary;
-  }
-
-  .effect-value {
-    font-size: $font-size-sm;
-    font-weight: 600;
-    color: $color-success;
-  }
-}
-
-.quantity-control {
-  h4 {
-    font-size: $font-size-sm;
-    color: $text-muted;
-    margin: 0 0 $spacing-sm;
-  }
-}
-
-.quantity-input {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: $spacing-lg;
-}
-
-.quantity-btn {
-  width: 40px;
-  height: 40px;
-  background: $bg-light;
-  border: 1px solid $border-medium;
-  border-radius: 50%;
-  font-size: $font-size-xl;
-  font-weight: 700;
-  color: $text-primary;
-  cursor: pointer;
-  transition: all $transition-fast;
-
-  &:hover:not(:disabled) {
-    border-color: $color-primary;
-  }
-
-  &:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-  }
-}
-
-.quantity-value {
-  font-size: $font-size-2xl;
-  font-weight: 700;
-  color: $text-highlight;
-  min-width: 40px;
-  text-align: center;
-}
-
-.target-select {
-  h4 {
-    font-size: $font-size-sm;
-    color: $text-muted;
-    margin: 0 0 $spacing-sm;
+  .modal-subtitle {
+    font-size: 12px;
+    color: var(--accent-gold);
   }
 }
 
 .target-list {
+  padding: 10px;
+  max-height: 200px;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: $spacing-xs;
-  max-height: 150px;
-  overflow-y: auto;
+  gap: 4px;
 }
 
-.target-item {
+.target-option {
   display: flex;
-  align-items: center;
-  gap: $spacing-sm;
-  padding: $spacing-sm $spacing-md;
-  background: $bg-dark;
-  border: 1px solid $border-dark;
-  border-radius: $radius-sm;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-dark);
+  border-radius: 2px;
   cursor: pointer;
-  transition: all $transition-fast;
+  transition: all 0.15s;
+  text-align: left;
+  width: 100%;
 
   &:hover {
-    border-color: $color-primary;
+    background: var(--bg-hover);
   }
 
   &--selected {
-    border-color: $color-accent;
-    background: rgba($color-accent, 0.1);
-  }
-
-  .target-icon {
-    font-size: $font-size-lg;
-  }
-
-  .target-name {
-    flex: 1;
-    font-weight: 500;
-    color: $text-primary;
-  }
-
-  .target-desc {
-    font-size: $font-size-xs;
-    color: $text-muted;
+    background: var(--bg-hover);
+    border-color: var(--accent-corrupt);
   }
 }
 
-.purchase-footer {
-  margin-top: auto;
-  padding-top: $spacing-lg;
-  border-top: 1px solid $border-dark;
-}
-
-.total-price {
+.target-main {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: $spacing-md;
-  margin-bottom: $spacing-md;
-
-  .total-label {
-    font-size: $font-size-base;
-    color: $text-muted;
-  }
-
-  .total-value {
-    display: flex;
-    align-items: center;
-    gap: $spacing-xs;
-    font-size: $font-size-2xl;
-    font-weight: 700;
-    color: $color-primary-light;
-
-    &--insufficient {
-      color: $color-danger;
-    }
-
-    .price-icon {
-      font-size: $font-size-lg;
-    }
-  }
+  gap: 6px;
 }
 
-// 奴隶详情
-.slave-detail {
+.target-type {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.target-name {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.target-info {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.no-target {
+  font-size: 13px;
+  color: var(--text-dim);
   text-align: center;
-  padding-bottom: $spacing-lg;
-  border-bottom: 1px solid $border-dark;
+  padding: 20px;
 }
 
-.slave-portrait {
-  width: 80px;
-  height: 80px;
-  background: linear-gradient(135deg, #ffd1dc 0%, #ffb6c1 100%);
-  border: 3px solid $border-light;
-  border-radius: 50%;
+.modal-actions {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 3rem;
-  margin: 0 auto $spacing-md;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-dark);
 }
 
-.slave-detail-name {
-  font-size: $font-size-xl;
-  font-weight: 700;
-  color: $text-highlight;
-  margin: 0 0 $spacing-sm;
-}
-
-.slave-detail-tags {
+.market-tabs {
   display: flex;
-  justify-content: center;
-  gap: $spacing-sm;
+  gap: 4px;
 }
 
-.slave-attributes {
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-md;
-}
+.market-tab {
+  flex: 1;
+  padding: 6px;
+  border: 1px solid var(--border-dark);
+  border-radius: 2px;
+  background: var(--bg-tertiary);
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
 
-.attr-row {
-  display: flex;
-  align-items: center;
-  gap: $spacing-md;
-
-  .attr-label {
-    width: 60px;
-    font-size: $font-size-sm;
-    color: $text-muted;
+  &:hover {
+    color: var(--text-secondary);
   }
 
-  .attr-bar {
+  &--active {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    border-color: var(--border-light);
+  }
+}
+
+.goods-list,
+.slave-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.goods-item,
+.slave-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+
+  &__info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
     flex: 1;
-    height: 8px;
-    background: $bg-light;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  .attr-fill {
-    height: 100%;
-    background: $color-primary;
-    border-radius: 4px;
-
-    &--accent {
-      background: $color-accent;
-    }
-  }
-
-  .attr-value {
-    min-width: 40px;
-    text-align: right;
-    font-weight: 600;
-    color: $text-primary;
-
-    &--special {
-      color: $color-accent;
-    }
+    min-width: 0;
   }
 }
 
-.empty-state,
-.empty-purchase {
+.goods-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.goods-name,
+.slave-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.needs-target-badge {
+  font-size: 10px;
+  padding: 1px 4px;
+  background: rgba(190, 149, 85, 0.3);
+  color: var(--accent-gold);
+  border-radius: 2px;
+}
+
+.goods-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.goods-meta {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.slave-detail {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.slave-stats {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.slave-item__action {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: $spacing-2xl;
-  color: $text-muted;
-
-  .empty-icon {
-    font-size: 3rem;
-    opacity: 0.3;
-    margin-bottom: $spacing-md;
-  }
-
-  p {
-    margin: 0;
-  }
-
-  .empty-hint {
-    font-size: $font-size-sm;
-    margin-top: $spacing-xs;
-  }
+  align-items: flex-end;
+  gap: 4px;
 }
 
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity $transition-fast;
+.slave-price {
+  font-size: 13px;
+  color: var(--accent-corrupt);
+  font-weight: 500;
 }
 
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
+.empty-hint {
+  font-size: 13px;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 20px;
 }
 </style>

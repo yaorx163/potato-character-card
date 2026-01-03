@@ -71,6 +71,8 @@ export interface 母畜创建配置 {
     来源?: string;
     描述?: string;
     魅力?: number;
+    臣服度?: number;
+    淫乱度?: number;
     来源地点ID?: string;
     总生育力?: number;
     剩余生育力?: number;

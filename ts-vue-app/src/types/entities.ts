@@ -8,6 +8,7 @@ import type { 属性约束配置, 元数据配置, 武装等级 } from './common
 
 // ─── 实体基类 ───
 export interface 实体初始数据 {
+    实体ID?: string;
     元数据?: Partial<元数据配置>;
     属性约束?: Map<string, 属性约束配置>;
 }
@@ -62,7 +63,7 @@ export interface 冠军初始数据 extends 实体初始数据 {
     智力?: number;
     管理喽啰池?: 喽啰池实体;
     来源?: string;
-    生母?: 母畜实体;
+    生母?: string | null;
 }
 
 // ─── 母畜 ───
@@ -100,7 +101,7 @@ export interface 母畜初始数据 extends 实体初始数据 {
     臣服度?: number;
     特性列表?: string[];
     来源地点ID?: string | null;
-    冠军生育记录?: 冠军实体[];
+    冠军生育记录?: string[];
     喽啰生育记录?: number;
     母畜特性列表?: 母畜特性[];
 }

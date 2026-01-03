@@ -62,7 +62,7 @@ def write_directory_structure():
         print(f"✗ 写入目录结构时出错: {e}")
         return False
 
-def process_ts_files():
+def process_ts_files(target):
     """处理所有.ts文件（跳过main.ts）"""
     src_dir = Path("./src")
     
@@ -72,11 +72,11 @@ def process_ts_files():
     try:
         with open("./out.txt", 'a', encoding='utf-8') as out_file:
             # 递归查找所有.ts文件
-            for ts_file in src_dir.rglob("*.ts"):
+            for ts_file in src_dir.rglob(target):
                 # 跳过main.ts
-                if ts_file.name.lower() == "main.ts":
-                    print(f"跳过: {ts_file.relative_to(src_dir)}")
-                    continue
+                # if ts_file.name.lower() == "main.ts":
+                #     print(f"跳过: {ts_file.relative_to(src_dir)}")
+                #     continue
                 
                 try:
                     # 读取文件内容
@@ -119,7 +119,8 @@ def check_src_directory():
     # 检查是否有.ts文件（不包括main.ts）
     has_ts_files = any(f.suffix.lower() == '.ts' 
                        for f in src_dir.rglob("*.ts") 
-                       if f.name.lower() != 'main.ts')
+                    #    if f.name.lower() != 'main.ts'
+                       )
     
     if not has_ts_files:
         print("⚠ 警告: ./src 目录中没有找到.ts文件（或只有main.ts）")
@@ -145,7 +146,7 @@ def main():
         print("警告: 目录结构写入失败，继续处理...")
     
     # 步骤3: 处理.ts文件
-    if not process_ts_files():
+    if not process_ts_files("*.vue"):
         print("警告: .ts文件处理过程中出现错误")
     
     # 显示结果

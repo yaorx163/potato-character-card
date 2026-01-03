@@ -1,58 +1,60 @@
-<!-- App.vue (更新版) -->
+<!-- App.vue -->
 <script setup lang="ts">
-import { onMounted } from 'vue';
-import { useGameStore } from './stores/gameStore';
-import GameHeader from './components/layout/GameHeader.vue';
-import GameSidebar from './components/layout/GameSidebar.vue';
-import MainContent from './components/layout/MainContent.vue';
-import EntityDetailSidebar from './components/sidebar/EntityDetailSidebar.vue';
-import TurnSummaryModal from './components/modals/TurnSummaryModal.vue';
+import { onMounted } from 'vue'
+import { useGameStore } from './stores/gameStore'
+import GameController from './components/layout/GameController.vue'
+import NotificationToast from './components/common/NotificationToast.vue'
 
-const store = useGameStore();
+const store = useGameStore()
 
 onMounted(() => {
-  store.初始化();
-});
+  store.初始化()
+})
 </script>
 
 <template>
-  <div class="game-app" v-if="store.已初始化">
-    <GameHeader />
-    <div class="game-body">
-      <GameSidebar />
-      <MainContent />
-      <EntityDetailSidebar />
-    </div>
-
-    <!-- 通知区域 -->
-    <div class="notification-area">
-      <TransitionGroup name="notification">
-        <div
-          v-for="notification in store.通知列表"
-          :key="notification.id"
-          class="notification"
-          :class="`notification--${notification.类型}`"
-          @click="store.移除通知(notification.id)"
-        >
-          {{ notification.消息 }}
-        </div>
-      </TransitionGroup>
-    </div>
-
-    <!-- 回合结算弹窗 -->
-    <TurnSummaryModal
-      v-if="store.显示回合结算弹窗"
-      :summary="store.最新结算摘要"
-      @close="store.显示回合结算弹窗 = false"
-    />
+  <div class="goblin-game-controller" v-if="store.已初始化">
+    <GameController />
+    <NotificationToast />
   </div>
-
-  <div v-else class="loading-screen">
-    <div class="loading-content">
-      <span class="loading-icon">👹</span>
-      <p>正在唤醒哥布林王...</p>
-    </div>
+  <div v-else class="loading-state">
+    <span class="loading-icon">⚔</span>
+    <span>唤醒黑暗...</span>
   </div>
 </template>
 
-<!-- 样式与之前相同 -->
+<style lang="scss">
+@import './styles/dark-fantasy.scss';
+
+.goblin-game-controller {
+  width: 100%;
+  // max-width: 480px;
+  // min-width: 320px;
+  font-family: 'Noto Sans SC', sans-serif;
+  font-size: 18px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-dark);
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+}
+
+.loading-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px;
+  color: var(--text-dim);
+  background: var(--bg-primary);
+
+  .loading-icon {
+    animation: pulse 1.5s infinite;
+  }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+</style>

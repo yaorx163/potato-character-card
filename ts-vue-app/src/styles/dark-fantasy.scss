@@ -1,418 +1,114 @@
 // styles/dark-fantasy.scss
-@use './variables' as *;
-
-// ═══════════════════════════════════════════════════════════════
-// 全局样式
-// ═══════════════════════════════════════════════════════════════
-
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html, body {
-  height: 100%;
-  background: $bg-darkest;
-  color: $text-primary;
-  font-family: $font-family-ui;
-  font-size: 16px;
-  line-height: $line-height-base;
-}
-
-#app {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-// 滚动条样式
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: $bg-dark;
-}
-
-::-webkit-scrollbar-thumb {
-  background: $border-light;
-  border-radius: $radius-sm;
-
-  &:hover {
-    background: $color-primary;
+:root {
+    // 暗色系
+    --bg-primary: #1a1a1f;
+    --bg-secondary: #242429;
+    --bg-tertiary: #2d2d33;
+    --bg-hover: #35353d;
+  
+    // 边框
+    --border-dark: #3a3a42;
+    --border-light: #4a4a55;
+  
+    // 文字
+    --text-primary: #e8e6e3;
+    --text-secondary: #a8a5a0;
+    --text-dim: #6a6862;
+  
+    // 强调色
+    --accent-blood: #8b2635;
+    --accent-blood-light: #a83242;
+    --accent-gold: #c9a227;
+    --accent-poison: #4a7c3f;
+    --accent-mana: #4a5c8a;
+    --accent-corrupt: #6b4a7c;
+  
+    // 状态色
+    --success: #4a7c3f;
+    --warning: #8b6914;
+    --danger: #8b2635;
+    --info: #4a5c8a;
   }
-}
-
-// ═══════════════════════════════════════════════════════════════
-// 通用组件样式
-// ═══════════════════════════════════════════════════════════════
-
-// 面板容器
-.panel {
-  background: $bg-dark;
-  border: 1px solid $border-dark;
-  border-radius: $radius-md;
-  padding: $spacing-lg;
-
-  &--elevated {
-    box-shadow: $shadow-md;
+  
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
   }
-
-  &__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: $spacing-lg;
-    padding-bottom: $spacing-md;
-    border-bottom: 1px solid $border-dark;
+  
+  // 滚动条
+  ::-webkit-scrollbar {
+    width: 4px;
   }
-
-  &__title {
-    font-family: $font-family-base;
-    font-size: $font-size-xl;
-    color: $text-highlight;
-    display: flex;
-    align-items: center;
-    gap: $spacing-sm;
-
-    &::before {
-      content: '◆';
-      color: $color-accent;
-      font-size: $font-size-sm;
-    }
+  ::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
   }
-
-  &__content {
-    min-height: 200px;
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-light);
+    border-radius: 2px;
   }
-}
-
-// 卡片
-.card {
-  background: $bg-medium;
-  border: 1px solid $border-medium;
-  border-radius: $radius-md;
-  padding: $spacing-md;
-  cursor: pointer;
-  transition: all $transition-base;
-
-  &:hover {
-    border-color: $color-primary;
-    transform: translateY(-2px);
-    box-shadow: $shadow-md;
-  }
-
-  &--selected {
-    border-color: $color-accent;
-    background: rgba($color-accent, 0.1);
-  }
-
-  &--disabled {
-    opacity: 0.5;
-    pointer-events: none;
-  }
-
-  &__header {
-    display: flex;
-    align-items: center;
-    gap: $spacing-sm;
-    margin-bottom: $spacing-sm;
-  }
-
-  &__title {
-    font-size: $font-size-lg;
-    font-weight: 600;
-    color: $text-highlight;
-  }
-
-  &__subtitle {
-    font-size: $font-size-sm;
-    color: $text-muted;
-  }
-
-  &__body {
-    font-size: $font-size-sm;
-    color: $text-secondary;
-  }
-
-  &__stats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-    gap: $spacing-sm;
-    margin-top: $spacing-md;
-  }
-}
-
-// 统计项
-.stat {
-  display: flex;
-  flex-direction: column;
-  gap: $spacing-xs;
-
-  &__label {
-    font-size: $font-size-xs;
-    color: $text-muted;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  &__value {
-    font-size: $font-size-lg;
-    font-weight: 600;
-    color: $text-primary;
-
-    &--success { color: $color-success; }
-    &--warning { color: $color-warning; }
-    &--danger { color: $color-danger; }
-    &--accent { color: $color-accent; }
-  }
-}
-
-// 按钮
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: $spacing-sm;
-  padding: $spacing-sm $spacing-lg;
-  border: 1px solid transparent;
-  border-radius: $radius-sm;
-  font-family: $font-family-ui;
-  font-size: $font-size-sm;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all $transition-fast;
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-
-  &--primary {
-    background: $color-primary;
-    border-color: $color-primary-dark;
-    color: $text-highlight;
-
+  
+  // 通用组件样式
+  .btn {
+    padding: 4px 10px;
+    border: 1px solid var(--border-dark);
+    border-radius: 2px;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.15s;
+  
     &:hover:not(:disabled) {
-      background: $color-primary-light;
+      background: var(--bg-hover);
+      color: var(--text-primary);
+      border-color: var(--border-light);
+    }
+  
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+  
+    &--primary {
+      background: var(--accent-blood);
+      border-color: var(--accent-blood);
+      color: var(--text-primary);
+  
+      &:hover:not(:disabled) {
+        background: var(--accent-blood-light);
+      }
+    }
+  
+    &--small {
+      padding: 2px 6px;
+      font-size: 15px;
     }
   }
-
-  &--accent {
-    background: $color-accent;
-    border-color: $color-accent-dark;
-    color: $bg-darkest;
-
-    &:hover:not(:disabled) {
-      background: $color-accent-light;
+  
+  .tag {
+    display: inline-block;
+    padding: 1px 5px;
+    font-size: 15px;
+    border-radius: 2px;
+    background: var(--bg-tertiary);
+    color: var(--text-dim);
+  
+    &--blood { background: rgba(139,38,53,0.3); color: #d4626f; }
+    &--gold { background: rgba(201,162,39,0.2); color: #d4b84a; }
+    &--mana { background: rgba(74,92,138,0.3); color: #7a9cd4; }
+    &--poison { background: rgba(74,124,63,0.3); color: #7ac46a; }
+  }
+  
+  .progress-bar {
+    height: 4px;
+    background: var(--bg-primary);
+    border-radius: 2px;
+    overflow: hidden;
+  
+    &__fill {
+      height: 100%;
+      transition: width 0.3s;
     }
   }
-
-  &--danger {
-    background: $color-danger;
-    border-color: darken($color-danger, 10%);
-    color: $text-highlight;
-
-    &:hover:not(:disabled) {
-      background: lighten($color-danger, 10%);
-    }
-  }
-
-  &--ghost {
-    background: transparent;
-    border-color: $border-medium;
-    color: $text-secondary;
-
-    &:hover:not(:disabled) {
-      border-color: $color-primary;
-      color: $text-primary;
-    }
-  }
-
-  &--sm {
-    padding: $spacing-xs $spacing-sm;
-    font-size: $font-size-xs;
-  }
-
-  &--lg {
-    padding: $spacing-md $spacing-xl;
-    font-size: $font-size-base;
-  }
-
-  &--block {
-    width: 100%;
-  }
-}
-
-// 输入框
-.input {
-  width: 100%;
-  padding: $spacing-sm $spacing-md;
-  background: $bg-medium;
-  border: 1px solid $border-medium;
-  border-radius: $radius-sm;
-  color: $text-primary;
-  font-family: $font-family-ui;
-  font-size: $font-size-sm;
-  transition: border-color $transition-fast;
-
-  &::placeholder {
-    color: $text-muted;
-  }
-
-  &:focus {
-    outline: none;
-    border-color: $color-primary;
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-}
-
-// 标签/徽章
-.badge {
-  display: inline-flex;
-  align-items: center;
-  padding: $spacing-xs $spacing-sm;
-  border-radius: $radius-sm;
-  font-size: $font-size-xs;
-  font-weight: 500;
-
-  &--primary {
-    background: rgba($color-primary, 0.2);
-    color: $color-primary-light;
-  }
-
-  &--accent {
-    background: rgba($color-accent, 0.2);
-    color: $color-accent-light;
-  }
-
-  &--success {
-    background: rgba($color-success, 0.2);
-    color: lighten($color-success, 20%);
-  }
-
-  &--warning {
-    background: rgba($color-warning, 0.2);
-    color: lighten($color-warning, 20%);
-  }
-
-  &--danger {
-    background: rgba($color-danger, 0.2);
-    color: lighten($color-danger, 30%);
-  }
-}
-
-// 进度条
-.progress {
-  height: 8px;
-  background: $bg-light;
-  border-radius: $radius-sm;
-  overflow: hidden;
-
-  &__bar {
-    height: 100%;
-    border-radius: $radius-sm;
-    transition: width $transition-base;
-
-    &--primary { background: $color-primary; }
-    &--accent { background: $color-accent; }
-    &--success { background: $color-success; }
-    &--warning { background: $color-warning; }
-    &--danger { background: $color-danger; }
-  }
-}
-
-// 分割线
-.divider {
-  height: 1px;
-  background: $border-dark;
-  margin: $spacing-lg 0;
-
-  &--vertical {
-    width: 1px;
-    height: auto;
-    margin: 0 $spacing-md;
-  }
-}
-
-// 网格布局
-.grid {
-  display: grid;
-  gap: $spacing-md;
-
-  &--2 { grid-template-columns: repeat(2, 1fr); }
-  &--3 { grid-template-columns: repeat(3, 1fr); }
-  &--4 { grid-template-columns: repeat(4, 1fr); }
-
-  &--auto-fill {
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  }
-}
-
-// Flex 布局
-.flex {
-  display: flex;
-
-  &--center { align-items: center; justify-content: center; }
-  &--between { justify-content: space-between; }
-  &--column { flex-direction: column; }
-  &--wrap { flex-wrap: wrap; }
-  &--gap-sm { gap: $spacing-sm; }
-  &--gap-md { gap: $spacing-md; }
-  &--gap-lg { gap: $spacing-lg; }
-}
-
-// 工具类
-.text {
-  &--center { text-align: center; }
-  &--right { text-align: right; }
-  &--muted { color: $text-muted; }
-  &--accent { color: $color-accent; }
-  &--success { color: $color-success; }
-  &--warning { color: $color-warning; }
-  &--danger { color: $color-danger; }
-}
-
-.mt-sm { margin-top: $spacing-sm; }
-.mt-md { margin-top: $spacing-md; }
-.mt-lg { margin-top: $spacing-lg; }
-.mb-sm { margin-bottom: $spacing-sm; }
-.mb-md { margin-bottom: $spacing-md; }
-.mb-lg { margin-bottom: $spacing-lg; }
-
-// ═══════════════════════════════════════════════════════════════
-// 动画
-// ═══════════════════════════════════════════════════════════════
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-.animate {
-  &--fadeIn { animation: fadeIn $transition-base; }
-  &--slideInUp { animation: slideInUp $transition-base; }
-  &--pulse { animation: pulse 2s infinite; }
-}
+  
