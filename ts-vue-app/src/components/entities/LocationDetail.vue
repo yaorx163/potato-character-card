@@ -94,8 +94,7 @@ const locationInfo = computed(() => {
 // 是否已选为战斗目标
 const isSelectedAsTarget = computed(() => {
   if (!location.value) return false;
-  const combatManager = store.游戏实例?.获取战斗管理器();
-  return combatManager?.获取选定目标()?.实体ID === location.value.实体ID;
+  return store.游戏实例?.战斗管理?.获取选定目标()?.实体ID === location.value.实体ID;
 });
 
 // 是否可攻击
@@ -111,7 +110,7 @@ function selectAsTarget() {
 }
 
 function deselectTarget() {
-  store.游戏实例?.获取战斗管理器()?.取消目标选择();
+  store.游戏实例?.战斗管理.取消目标选择();
 }
 
 function assignScoutTask() {

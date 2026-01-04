@@ -6,10 +6,14 @@ import { useGameStore } from '@/stores/gameStore'
 
 const store = useGameStore()
 
-const pendingTasks = computed(() => store.已发布任务列表.length)
-const hasCombat = computed(() =>
-  store.游戏实例?.获取战斗管理器().是否战斗 ?? false
-)
+const pendingTasks = computed(() =>{
+  store.检查状态更新()
+  return store.已发布任务列表.length
+})
+const hasCombat = computed(() =>{
+  store.检查状态更新()
+  return store.游戏实例?.战斗管理.是否战斗() ?? false
+})
 
 function endTurn() {
   store.结束回合()

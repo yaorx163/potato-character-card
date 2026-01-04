@@ -13,7 +13,7 @@ const activeTab = ref<MarketTab>('goods');
 const selectingTargetFor = ref<string | null>(null); // 商品名或奴隶ID
 const selectedTarget = ref<string | null>(null);
 
-const marketManager = computed(() => store.游戏实例?.获取黑市管理器());
+const marketManager = computed(() => store.游戏实例?.系统管理.获取黑市管理器());
 
 interface GoodsConfig {
   价格?: number;
@@ -37,8 +37,7 @@ const allGoods = computed(
 );
 
 const slaves = computed(() => {
-  // store.检查状态更新();
-  console.log(marketManager.value?.获取奴隶货架());
+  store.检查状态更新();
   return marketManager.value?.获取奴隶货架() ?? [];
 });
 

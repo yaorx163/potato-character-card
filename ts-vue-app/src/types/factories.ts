@@ -2,9 +2,10 @@
 // core/types/factories.ts
 // 工厂相关类型定义
 // ═══════════════════════════════════════════════════════════════
-import { 冠军实体, 可袭击地点实体, 母畜实体, 领主实体 } from '../core/entities';
+import { 冠军实体, 可袭击地点实体, 母畜实体, 领主实体, type 武装等级配置 } from '../core/entities';
 
 import type { 姓名池配置, 属性系数, 数值范围 } from './common';
+import type { 奴隶刷新配置 } from './systems';
 
 // ─── 生育效率表 ───
 // export interface 生育效率表 {
@@ -131,9 +132,11 @@ export interface 地点创建配置 {
 }
 
 // ─── 运行时配置 ───
-export interface 运行时配置接口 {
+export interface 运行时实体配置 {
     冠军配置?: 冠军工厂配置;
     母畜配置?: 母畜工厂配置;
     领主配置?: 领主工厂配置;
     地点配置?: 可袭击地点工厂配置;
+    喽啰池配置?: 武装等级配置[];
+    黑市奴隶刷新配置?: 奴隶刷新配置;
 }

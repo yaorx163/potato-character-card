@@ -10,6 +10,7 @@ interface TaskConfig {
   描述?: string;
   需要目标?: boolean;
   目标实体类型?: string | null;
+  执行人实体类型?: string | null;
 }
 
 export const useGameStore = defineStore('game', () => {
@@ -45,7 +46,6 @@ export const useGameStore = defineStore('game', () => {
 
     const 游戏 = 启动游戏();
     游戏实例.value = 游戏;
-    游戏.初始化(游戏.获取工厂管理器());
     已初始化.value = true;
 
     添加通知('success', '游戏初始化成功！');
@@ -58,6 +58,7 @@ export const useGameStore = defineStore('game', () => {
   const generalUpdateMarker = ref(0);
   const 战斗状态 = ref(0);
   const 喽啰状态 = ref(0);
+  
   // ─── 更新方法 ───
   const 更新冠军列表 = () => {
     championsUpdateMarker.value++;
@@ -91,35 +92,35 @@ export const useGameStore = defineStore('game', () => {
   };
 
   // ─── 计算属性 ───
-  const 领主 = computed(() => 游戏实例.value?.获取领主() ?? null);
+  const 领主 = computed(() => 游戏实例.value?.领主管理.获取领主() ?? null);
 
   const 所有冠军 = computed(() => {
     检查状态更新();
-    return 游戏实例.value?.获取所有冠军() ?? [];
+    return 游戏实例.value?.冠军管理.获取所有冠军() ?? [];
   });
 
   const 所有母畜 = computed(() => {
     检查状态更新();
-    return 游戏实例.value?.获取所有母畜() ?? [];
+    return 游戏实例.value?.母畜管理.获取所有母畜() ?? [];
   });
 
   const 所有地点 = computed(() => {
     检查状态更新();
-    return 游戏实例.value?.获取所有地点() ?? [];
+    return 游戏实例.value?.地点管理.获取所有地点() ?? [];
   });
 
   const 当前回合 = computed(() => {
     检查状态更新();
-    return 游戏实例.value?.获取回合管理器().获取当前回合() ?? 0;
+    return 游戏实例.value?.回合管理.获取当前回合() ?? 0;
   });
 
   const 资源状态 = computed(() => {
     检查状态更新();
     return (
-      游戏实例.value?.获取资源管理器().获取资源状态() ?? {
-        士气: 0,
-        最大士气: 100,
-        催淫母乳: 0,
+      {
+        士气: 游戏实例.value?.资源管理.获取士气() ?? 0,
+        最大士气: 游戏实例.value?.资源管理.获取最大士气() ?? 100,
+        催淫母乳: 游戏实例.value?.资源管理.获取催淫母乳数量() ?? 0,
       }
     );
   });
@@ -140,44 +141,57 @@ export const useGameStore = defineStore('game', () => {
 
   const 已发布任务列表 = computed(() => {
     检查状态更新();
-    return 游戏实例.value?.获取任务管理器().获取已发布任务列表() ?? [];
+    return 游戏实例.value?.任务管理.获取已发布任务列表() ?? [];
   });
+
+  const 已发现母畜的地点 = computed(() => {
+    检查状态更新();
+    return 游戏实例.value?.地点管理.获取所有地点().filter(p => {
+      return p.已侦察母畜.size > 0;
+    }) ?? [];
+  })
 
   // ─── 选中实体 ───
   const 选中的冠军 = computed(() => {
     检查状态更新();
     if (选中实体类型.value !== '冠军' || !选中实体ID.value) return null;
-    return 游戏实例.value?.获取冠军(选中实体ID.value) ?? null;
+    return 游戏实例.value?.冠军管理.获取冠军(选中实体ID.value) ?? null;
   });
 
   const 选中的母畜 = computed(() => {
     检查状态更新();
     if (选中实体类型.value !== '母畜' || !选中实体ID.value) return null;
-    return 游戏实例.value?.获取母畜(选中实体ID.value) ?? null;
+    return 游戏实例.value?.母畜管理.获取母畜(选中实体ID.value) ?? null;
   });
 
   const 选中的地点 = computed(() => {
     检查状态更新();
     if (选中实体类型.value !== '地点' || !选中实体ID.value) return null;
-    return 游戏实例.value?.获取地点(选中实体ID.value) ?? null;
+    return 游戏实例.value?.地点管理.获取地点(选中实体ID.value) ?? null;
   });
 
-  // 任务选择状态
+  // 统一的任务选择状态管理
   const 任务选择状态 = reactive({
     isSelecting: false,
     taskId: null as string | null,
-    targetType: null as string | null,
+    assigneeId: null as string | null,
     availableTargets: [] as Array<{ id: string; name: string; type: string }>,
     selectedTarget: null as string | null,
-    assignerId: null as string | null,
+    // 多层选择状态
+    multiLevelSelection: {
+      isActive: false,
+      currentLevel: 0, // 0: 第一层选择, 1: 第二层选择
+      firstLevelTarget: null as { id: string; name: string } | null, // 选中的地点
+      taskId: null as string | null,
+      assigneeId: null as string | null,
+    }
   });
 
   // 获取任务可选目标
   const getTaskTargets = (taskId: string, assignerId: string) => {
-    const taskManager = 游戏实例.value?.获取任务管理器();
-    if (!taskManager) return [];
+    if (!游戏实例.value) return [];
 
-    const config = taskManager.获取任务配置(taskId) as TaskConfig;
+    const config = 游戏实例.value?.任务管理.获取任务配置(taskId) as TaskConfig;
     const result: { id: string; name: string; type: string }[] = [];
 
     if (config.目标实体类型 === '冠军实体') {
@@ -200,23 +214,97 @@ export const useGameStore = defineStore('game', () => {
       });
     }
 
+    if (config.目标实体类型 === '可袭击地点实体-母畜实体') {
+      已发现母畜的地点.value.forEach(l => {
+        result.push({ id: l.实体ID, name: l.地点名称, type: '地点' });
+      });
+    }
+
     return result;
   };
 
-  // 开始任务目标选择
+  // 开始任务目标选择（单层）
   const 开始任务目标选择 = (taskId: string, assignerId: string) => {
     任务选择状态.isSelecting = true;
     任务选择状态.taskId = taskId;
-    任务选择状态.assignerId = assignerId;
+    任务选择状态.assigneeId = assignerId;
     任务选择状态.selectedTarget = null;
     任务选择状态.availableTargets = getTaskTargets(taskId, assignerId);
+    
+    // 重置多层选择状态
+    任务选择状态.multiLevelSelection = {
+      isActive: false,
+      currentLevel: 0,
+      firstLevelTarget: null,
+      taskId: null,
+      assigneeId: null,
+    };
+  };
+
+  const 开始多层目标选择 = (taskId: string, assigneeId: string) => {
+    检查状态更新();
+    任务选择状态.multiLevelSelection = {
+      isActive: true,
+      currentLevel: 0,
+      firstLevelTarget: null,
+      taskId,
+      assigneeId,
+    };
+    任务选择状态.isSelecting = true;
+    任务选择状态.taskId = taskId;
+    任务选择状态.assigneeId = assigneeId;
+
+    // 显示第一层目标：可袭击地点
+    const 可劝诱地点 = 游戏实例.value?.地点管理.获取所有地点().filter(p => {
+      return p.已侦察母畜.size > 0;
+    }) ?? []
+    const availableLocations = 可劝诱地点.map(location => ({
+      id: location.实体ID,
+      name: location.地点名称,
+      type: '地点'
+    }));
+    console.log("availableLocations", 已发现母畜的地点.value)
+    任务选择状态.availableTargets = availableLocations;
+    console.log("任务选择状态",任务选择状态)
+  };
+
+  // 选择第一层目标（地点）- 用于多层选择
+  const 选择地点目标 = (locationId: string) => {
+    if (!任务选择状态.multiLevelSelection.isActive) return;
+    
+    const location = 已发现母畜的地点.value.find(loc => loc.实体ID === locationId);
+    if (!location) return;
+
+    // 更新多层选择状态
+    任务选择状态.multiLevelSelection.currentLevel = 1;
+    任务选择状态.multiLevelSelection.firstLevelTarget = {
+      id: location.实体ID,
+      name: location.地点名称,
+    };
+
+    // 显示第二层目标：该地点的母畜
+    const availableBroodmothers = 获取地点已发现母畜(locationId)?.map(broodmother => ({
+      id: broodmother.id,
+      name: broodmother.name,
+      type: '母畜'
+    })) ?? [];
+    任务选择状态.availableTargets = availableBroodmothers;
   };
 
   // 选择目标并发布任务
   const 选择目标并发布任务 = (targetId: string) => {
-    if (!任务选择状态.taskId || !任务选择状态.assignerId) return;
+    if (!任务选择状态.taskId || !任务选择状态.assigneeId) return;
 
-    发布任务(任务选择状态.taskId, 任务选择状态.assignerId, targetId);
+    // 如果是多层选择，需要特殊处理
+    if (任务选择状态.multiLevelSelection.isActive && 
+        任务选择状态.multiLevelSelection.currentLevel === 0) {
+      // 这是第一层选择，切换到第二层
+      选择地点目标(targetId);
+      return;
+    }
+
+    // 普通单层目标选择或第二层选择
+    发布任务(任务选择状态.taskId, 任务选择状态.assigneeId, targetId);
 
     // 重置状态
     resetTaskSelection();
@@ -236,10 +324,18 @@ export const useGameStore = defineStore('game', () => {
   const resetTaskSelection = () => {
     任务选择状态.isSelecting = false;
     任务选择状态.taskId = null;
-    任务选择状态.targetType = null;
+    任务选择状态.assigneeId = null;
     任务选择状态.availableTargets = [];
     任务选择状态.selectedTarget = null;
-    任务选择状态.assignerId = null;
+    
+    // 重置多层选择状态
+    任务选择状态.multiLevelSelection = {
+      isActive: false,
+      currentLevel: 0,
+      firstLevelTarget: null,
+      taskId: null,
+      assigneeId: null,
+    };
   };
 
   // ─── 操作方法 ───
@@ -269,7 +365,7 @@ export const useGameStore = defineStore('game', () => {
 
     if (!执行人) return { 成功: false, 原因: '执行人不存在' };
 
-    const 结果 = 游戏实例.value.获取任务管理器().发布任务(任务名, 执行人 as any, 目标 as any);
+    const 结果 = 游戏实例.value.任务管理.发布任务(任务名, 执行人 as any, 目标 as any);
 
     if (结果.成功) {
       添加通知('success', `任务「${任务名}」已发布`);
@@ -284,7 +380,7 @@ export const useGameStore = defineStore('game', () => {
     更新通用状态(); // 使用通用更新
     if (!游戏实例.value) return;
 
-    const 结果 = 游戏实例.value.获取任务管理器().取消任务(任务ID);
+    const 结果 = 游戏实例.value.任务管理.取消任务(任务ID);
     if (结果.成功) {
       添加通知('info', '任务已取消');
     }
@@ -297,7 +393,7 @@ export const useGameStore = defineStore('game', () => {
     if (!游戏实例.value) return { 成功: false, 原因: '游戏未初始化' };
 
     const 目标 = 目标ID ? 游戏实例.value.实体管理.获取实体(目标ID) : null;
-    const 结果 = 游戏实例.value.获取法术管理器().使用法术(法术名, 倍率, 目标 as any);
+    const 结果 = 游戏实例.value.资源管理.使用法术(法术名, 倍率, 目标 as any);
 
     if (结果.成功) {
       添加通知('success', `法术「${法术名}」施放成功`);
@@ -315,7 +411,7 @@ export const useGameStore = defineStore('game', () => {
     if (!游戏实例.value) return { 成功: false, 原因: '游戏未初始化' };
 
     const 目标 = 目标ID ? 游戏实例.value.实体管理.获取实体(目标ID) : null;
-    const 结果 = 游戏实例.value.获取黑市管理器().购买商品(商品名, 数量, 目标 as any);
+    const 结果 = 游戏实例.value.资源管理.购买商品(商品名, 数量, 目标 as any);
 
     if (结果.成功) {
       添加通知('success', `成功购买「${商品名}」×${数量}`);
@@ -330,7 +426,7 @@ export const useGameStore = defineStore('game', () => {
     更新母畜列表();
     if (!游戏实例.value) return { 成功: false, 原因: '游戏未初始化' };
 
-    const 结果 = 游戏实例.value.获取黑市管理器().购买奴隶(商品ID);
+    const 结果 = 游戏实例.value.资源管理.购买奴隶(商品ID);
 
     if (结果.成功) {
       添加通知('success', `成功购买奴隶`);
@@ -344,24 +440,24 @@ export const useGameStore = defineStore('game', () => {
   // ─── 战斗系统 ───
   function 选择战斗目标(地点ID: string) {
     if (!游戏实例.value) return { 成功: false };
-    return 游戏实例.value.获取战斗管理器().选择目标(地点ID);
+    return 游戏实例.value.战斗管理.选择目标(地点ID);
   }
 
   function 添加出战将领(将领ID: string) {
     更新冠军列表();
     if (!游戏实例.value) return { 成功: false };
-    return 游戏实例.value.获取战斗管理器().添加出战将领(将领ID);
+    return 游戏实例.value.战斗管理.添加出战将领(将领ID);
   }
 
   function 移除出战将领(将领ID: string) {
     更新冠军列表();
     if (!游戏实例.value) return { 成功: false };
-    return 游戏实例.value.获取战斗管理器().移除出战将领(将领ID);
+    return 游戏实例.value.战斗管理.移除出战将领(将领ID);
   }
 
   function 确认战斗() {
     if (!游戏实例.value) return { 成功: false };
-    const 结果 = 游戏实例.value.获取战斗管理器().确认战斗();
+    const 结果 = 游戏实例.value.战斗管理.确认战斗();
     if (结果.成功) {
       添加通知('info', '战斗已确认，将在回合结算时执行');
     }
@@ -369,20 +465,19 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function 获取战斗预览() {
-    return 游戏实例.value?.获取战斗管理器().获取战斗预览() ?? null;
+    return 游戏实例.value?.战斗管理.获取战斗预览() ?? null;
   }
 
   // ─── 回合系统 ───
   function 结束回合() {
-    更新通用状态(); // 使用通用更新
+
     if (!游戏实例.value) return;
 
-    const 摘要 = 游戏实例.value.结束回合();
+    const 摘要 = 游戏实例.value.回合管理.结束回合();
     最新结算摘要.value = 摘要;
     显示回合结算弹窗.value = true;
-
     添加通知('info', `第 ${摘要.回合数} 回合结束`);
-
+    更新通用状态(); // 使用通用更新
     return 摘要;
   }
 
@@ -434,12 +529,12 @@ export const useGameStore = defineStore('game', () => {
 
   function 清空将领喽啰(championId: string): void {
     更新喽啰状态();
-    游戏实例.value?.获取实体管理器().清空将领喽啰池(championId);
+    游戏实例.value?.喽啰池管理.清空将领喽啰池(championId);
   }
 
   function 填满将领喽啰(championId: string): void {
     更新喽啰状态();
-    游戏实例.value?.获取实体管理器().快速填充到上限(championId);
+    游戏实例.value?.喽啰池管理.快速填充到上限(championId);
   }
 
   function 清空所有喽啰(): void {
@@ -450,7 +545,7 @@ export const useGameStore = defineStore('game', () => {
   // ========== 任务系统 ==========
 
   function 检查实体是否有任务(entityId: string): boolean {
-    return 游戏实例.value?.获取任务管理器().是否被占用(entityId) ?? false;
+    return 游戏实例.value?.任务管理.是否被占用(entityId) ?? false;
   }
 
   /**
@@ -502,7 +597,7 @@ export const useGameStore = defineStore('game', () => {
     百分比: number;
   } | null {
     检查状态更新();
-    const 地点 = 游戏实例.value?.获取实体管理器().获取地点(locationId);
+    const 地点 = 游戏实例.value?.地点管理.获取地点(locationId);
     if (!地点) return null;
     const 当前进度 = 地点.侦察进度;
     const 最大进度 = 地点.侦察最大值;
@@ -522,9 +617,9 @@ export const useGameStore = defineStore('game', () => {
     appeal: number;
   }> | null {
     检查状态更新();
-    const 地点 = 游戏实例.value?.获取实体管理器().获取地点(locationId);
+    const 地点 = 游戏实例.value?.地点管理.获取地点(locationId);
     if (!地点) return null;
-    const reslut: Array<{
+    const result: Array<{
       id: string;
       name: string;
       race: string;
@@ -532,7 +627,7 @@ export const useGameStore = defineStore('game', () => {
       appeal: number;
     }> = [];
     地点.已侦察母畜.forEach(母畜 => {
-      reslut.push({
+      result.push({
         id: 母畜.实体ID,
         name: 母畜.获取属性('姓名'),
         race: 母畜.获取属性('种族'),
@@ -540,7 +635,7 @@ export const useGameStore = defineStore('game', () => {
         appeal: 母畜.获取属性('魅力'),
       });
     });
-    return reslut;
+    return result;
   }
 
   /**
@@ -550,7 +645,7 @@ export const useGameStore = defineStore('game', () => {
    */
   function 获取地点未发现母畜数量(locationId: string): number | null {
     检查状态更新();
-    const 地点 = 游戏实例.value?.获取实体管理器().获取地点(locationId);
+    const 地点 = 游戏实例.value?.地点管理.获取地点(locationId);
     if (!地点) return null;
     return 地点.获取潜在母畜数量();
   }
@@ -559,7 +654,7 @@ export const useGameStore = defineStore('game', () => {
   function 保存游戏(槽位: number) {
     更新通用状态(); // 使用通用更新
     if (!游戏实例.value) return { 成功: false };
-    const 结果 = 游戏实例.value.获取存档管理器().保存游戏(游戏实例.value, 槽位);
+    const 结果 = 游戏实例.value.存档管理.保存游戏(游戏实例.value);
     if (结果.成功) {
       添加通知('success', '游戏已保存');
     }
@@ -569,7 +664,7 @@ export const useGameStore = defineStore('game', () => {
   function 加载游戏(槽位: number) {
     更新通用状态(); // 使用通用更新
     if (!游戏实例.value) return { 成功: false };
-    const 结果 = 游戏实例.value.获取存档管理器().加载存档(槽位, 游戏实例.value);
+    const 结果 = 游戏实例.value.存档管理.加载存档();
     if (结果.成功) {
       添加通知('success', '游戏已加载');
     }
@@ -595,6 +690,7 @@ export const useGameStore = defineStore('game', () => {
     所有冠军,
     所有母畜,
     所有地点,
+    已发现母畜的地点,
     当前回合,
     资源状态,
     魔力信息,
@@ -638,6 +734,7 @@ export const useGameStore = defineStore('game', () => {
     清除预选任务,
     获取预选任务,
     开始任务目标选择,
+    开始多层目标选择,
     选择目标并发布任务,
     直接发布无目标任务,
     取消任务选择,
@@ -648,6 +745,3 @@ export const useGameStore = defineStore('game', () => {
     加载游戏,
   };
 });
-
-// 购买商品,
-// 切换面板,

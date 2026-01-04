@@ -25,9 +25,10 @@ export interface 游戏初始化配置 {
     领主姓名?: string;
     初始魔力?: number;
     初始士气?: number;
+    最大士气?: number;
     初始催淫母乳?: number;
     初始喽啰数?: number;
-}
+};
 
 // ─── 游戏状态 ───
 export interface 游戏状态 {

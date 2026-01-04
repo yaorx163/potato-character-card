@@ -4,7 +4,7 @@
 // ═══════════════════════════════════════════════════════════════
 import type { 武装等级 } from "@/types/index";
 import type { 冠军实体, 喽啰池实体, 可袭击地点实体 } from "@/core/entities";
-import type { 任务管理器 } from "@/core/managers";
+import type { 任务管理器, 实体管理器 } from "@/core/managers";
 
 export interface 分配请求 {
     武装等级: 武装等级;
@@ -66,18 +66,6 @@ export interface 快速填充结果 {
     填充数量: number;
     当前战斗力: number;
     填充详情: Array<{ 等级: string; 数量: number }>;
-}
-
-export interface 喽啰池管理接口 {
-    获取无将领喽啰池: () => 喽啰池实体;
-    获取所有将领喽啰池: () => Map<string, 喽啰池实体>;
-}
-
-export interface 战斗系统依赖 {
-    任务管理器: 任务管理器;
-    喽啰池管理: 喽啰池管理接口;
-    获取将领: (将领ID: string) => 冠军实体 | null;
-    获取地点: (地点ID: string) => 可袭击地点实体 | null;
 }
 
 export interface 资源状态 {

@@ -90,21 +90,21 @@ const milkInfo = computed(() => {
 // 可用任务
 const availableTasks = computed(() => {
   if (!broodmother.value) return [];
-  const taskManager = store.游戏实例?.获取任务管理器();
-  if (!taskManager) return [];
 
-  const allTasks = taskManager.获取所有任务名();
+  const allTasks = store.游戏实例?.任务管理.获取所有任务名();
+  if (!allTasks) return [];
   return allTasks
     .filter(taskName => {
-      const config = taskManager.获取任务配置(taskName);
+      const config = store.游戏实例?.任务管理.获取任务配置(taskName);
       if (!config) return false;
       return config.执行人实体类型?.includes('母畜实体');
     })
     .map(taskName => {
-      const config = taskManager.获取任务配置(taskName);
+      const config = store.游戏实例?.任务管理.获取任务配置(taskName);
       return {
         name: taskName,
         needsTarget: config?.目标实体类型 ?? false ? true : false,
+        needsDoubleTarget: config?.目标实体类型?.includes('可袭击地点实体') ? true : false,
       };
     });
 });
@@ -116,11 +116,17 @@ const isBusy = computed(() => {
 });
 
 // 处理任务点击
-function handleTaskClick(taskName: string, needsTarget: boolean) {
+function handleTaskClick(taskName: string, task: 
+{name: string, needsTarget: boolean, needsDoubleTarget: boolean}
+) {
   if (!broodmother.value) return;
-
+  const needsTarget = task.needsTarget;
   if (needsTarget) {
-    store.开始任务目标选择(taskName, broodmother.value.实体ID);
+    if (task.needsDoubleTarget) {
+      store.开始任务目标选择(taskName, broodmother.value.实体ID);
+    } else {
+      store.开始任务目标选择(taskName, broodmother.value.实体ID);
+    }
   } else {
     store.直接发布无目标任务(taskName, broodmother.value.实体ID);
   }
@@ -202,7 +208,7 @@ function handleTaskClick(taskName: string, needsTarget: boolean) {
             class="btn btn--small"
             :class="{ 'btn--needs-target': task.needsTarget }"
             :disabled="isBusy"
-            @click="handleTaskClick(task.name, task.needsTarget)"
+            @click="handleTaskClick(task.name, task)"
           >
             {{ task.name }}
           </button>

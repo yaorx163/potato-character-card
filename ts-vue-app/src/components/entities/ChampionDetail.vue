@@ -27,20 +27,19 @@ const minionInfo = computed(() => {
 });
 
 const availableTasks = computed(() => {
-  const taskManager = store.游戏实例?.获取任务管理器();
-  if (!taskManager) return [];
-  return taskManager
-    .获取所有任务名()
+  if (!store.游戏实例) return [];
+  const allTasks = store.游戏实例?.任务管理.获取所有任务名();
+  return allTasks
     .map(name => ({
       name,
-      config: taskManager.获取任务配置(name),
+      config: store.游戏实例?.任务管理.获取任务配置(name),
     }))
     .filter(t => {
       return t.config?.执行人实体类型 === '冠军实体';
     })
     .map(t => ({
       name: t.name,
-      needsTarget: t.config?.目标实体类型 ?? false ? true : false,
+      needsTarget: t.config?.目标实体类型 ? true : false,
     }));
 });
 
@@ -134,12 +133,6 @@ function assignTask(task: { name: string; needsTarget: boolean }) {
   gap: 10px;
 }
 
-.champion-detail {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
 .detail-title {
   display: flex;
   align-items: center;
@@ -213,51 +206,6 @@ function assignTask(task: { name: string; needsTarget: boolean }) {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-}
-
-.target-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 8px;
-}
-
-.target-info {
-  font-size: 12px;
-  opacity: 0.8;
-}
-
-.no-task,
-.no-target {
-  font-size: 15px;
-  color: var(--text-dim);
-}
-
-.target-selector {
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 8px;
-  background: var(--bg-secondary);
-}
-
-.btn--selected {
-  background: var(--accent-primary);
-  color: white;
-}
-
-.target-actions {
-  display: flex;
-  gap: 4px;
-}
-
-.btn--confirm {
-  background: var(--accent-success);
-  color: white;
-}
-
-.btn--cancel {
-  background: var(--accent-error);
-  color: white;
 }
 
 /* 通用弹层样式 */

@@ -8,7 +8,7 @@ const store = useGameStore()
 
 const combatManager = computed(() => {
   store.检查状态更新()
-  return store.游戏实例?.获取战斗管理器()
+  return store.游戏实例?.系统管理.获取战斗管理器()
 })
 const selectedTarget = computed(() =>  {
   store.检查状态更新()
@@ -42,6 +42,7 @@ function removeChampion(championId: string) {
 }
 
 function confirmBattle() {
+  store.更新通用状态()
   store.确认战斗()
 }
 </script>

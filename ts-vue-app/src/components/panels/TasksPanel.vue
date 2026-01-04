@@ -16,12 +16,10 @@ interface TaskConfig {
 }
 
 const availableTasks = computed(() => {
-  const taskManager = store.游戏实例?.获取任务管理器();
-  if (!taskManager) return [];
-
-  return taskManager.获取所有任务名().map(name => ({
+  if (!store.游戏实例) return []
+  return store.游戏实例?.任务管理.获取所有任务名().map(name => ({
     name,
-    config: taskManager.获取任务配置(name) as TaskConfig | undefined,
+    config: store.游戏实例?.任务管理.获取任务配置(name) as TaskConfig | undefined,
   }));
 });
 
