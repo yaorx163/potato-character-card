@@ -1,12 +1,16 @@
 // stores/gameStore.ts
+import type { 冠军实体, 母畜实体, 领主实体 } from '@/core/entities';
+import type { 回合结算摘要 } from '@/types';
 import { defineStore } from 'pinia';
-import { ref, computed, shallowRef } from 'vue';
-import { 启动游戏, 获取当前游戏 } from '../game/bootstrap';
+import { computed, reactive, ref, shallowRef } from 'vue';
+import { 启动游戏 } from '../game/bootstrap';
 import type { 游戏总控 } from '../game/controller';
-import type { 冠军实体, 母畜实体, 可袭击地点实体, 领主实体 } from '@/core/entities';
-import type { 回合结算摘要, 已发布任务 } from '@/types';
 
-
+interface TaskConfig {
+  描述?: string;
+  需要目标?: boolean;
+  目标实体类型?: string | null;
+}
 
 export const useGameStore = defineStore('game', () => {
   // ─── 核心游戏实例 ───
@@ -25,12 +29,14 @@ export const useGameStore = defineStore('game', () => {
   const 预选目标ID = ref<string | null>(null);
 
   // ─── 通知系统 ───
-  const 通知列表 = ref<Array<{
-    id: number;
-    类型: 'success' | 'warning' | 'error' | 'info';
-    消息: string;
-    时间戳: number;
-  }>>([]);
+  const 通知列表 = ref<
+    Array<{
+      id: number;
+      类型: 'success' | 'warning' | 'error' | 'info';
+      消息: string;
+      时间戳: number;
+    }>
+  >([]);
   let 通知计数器 = 0;
 
   // ─── 初始化游戏 ───
@@ -45,115 +51,196 @@ export const useGameStore = defineStore('game', () => {
     添加通知('success', '游戏初始化成功！');
   }
 
-
   // 为不同类型的实体创建独立的更新标记
-  const championsUpdateMarker = ref(0)
-  const broodmothersUpdateMarker = ref(0)
-  const locationsUpdateMarker = ref(0)
-  const generalUpdateMarker = ref(0)
-  const 战斗状态 = ref(0)
-  const 喽啰状态 = ref(0)
+  const championsUpdateMarker = ref(0);
+  const broodmothersUpdateMarker = ref(0);
+  const locationsUpdateMarker = ref(0);
+  const generalUpdateMarker = ref(0);
+  const 战斗状态 = ref(0);
+  const 喽啰状态 = ref(0);
   // ─── 更新方法 ───
   const 更新冠军列表 = () => {
-    championsUpdateMarker.value++
-  }
+    championsUpdateMarker.value++;
+  };
 
   const 更新母畜列表 = () => {
-    broodmothersUpdateMarker.value++
-  }
+    broodmothersUpdateMarker.value++;
+  };
 
   const 更新地点列表 = () => {
-    locationsUpdateMarker.value++
-  }
+    locationsUpdateMarker.value++;
+  };
 
   const 更新通用状态 = () => {
-    generalUpdateMarker.value++
-  }
+    generalUpdateMarker.value++;
+  };
   const 更新战斗状态 = () => {
-    战斗状态.value++
-  }
+    战斗状态.value++;
+  };
   const 更新喽啰状态 = () => {
-    喽啰状态.value++
-  }
+    喽啰状态.value++;
+  };
 
   const 检查状态更新 = () => {
-    championsUpdateMarker.value
-    broodmothersUpdateMarker.value
-    locationsUpdateMarker.value
-    generalUpdateMarker.value
-    战斗状态.value
-    喽啰状态.value
-  }
+    championsUpdateMarker.value;
+    broodmothersUpdateMarker.value;
+    locationsUpdateMarker.value;
+    generalUpdateMarker.value;
+    战斗状态.value;
+    喽啰状态.value;
+  };
 
   // ─── 计算属性 ───
   const 领主 = computed(() => 游戏实例.value?.获取领主() ?? null);
 
   const 所有冠军 = computed(() => {
-    检查状态更新()
-    return 游戏实例.value?.获取所有冠军() ?? []
+    检查状态更新();
+    return 游戏实例.value?.获取所有冠军() ?? [];
   });
 
   const 所有母畜 = computed(() => {
-    检查状态更新()
-    return 游戏实例.value?.获取所有母畜() ?? []
+    检查状态更新();
+    return 游戏实例.value?.获取所有母畜() ?? [];
   });
 
   const 所有地点 = computed(() => {
-    检查状态更新()
-    return 游戏实例.value?.获取所有地点() ?? []
+    检查状态更新();
+    return 游戏实例.value?.获取所有地点() ?? [];
   });
 
   const 当前回合 = computed(() => {
-    检查状态更新()
-    return 游戏实例.value?.获取回合管理器().获取当前回合() ?? 0
+    检查状态更新();
+    return 游戏实例.value?.获取回合管理器().获取当前回合() ?? 0;
   });
 
   const 资源状态 = computed(() => {
-    检查状态更新()
-    return 游戏实例.value?.获取资源管理器().获取资源状态() ?? {
-      士气: 0,
-      最大士气: 100,
-      催淫母乳: 0
-    }
+    检查状态更新();
+    return (
+      游戏实例.value?.获取资源管理器().获取资源状态() ?? {
+        士气: 0,
+        最大士气: 100,
+        催淫母乳: 0,
+      }
+    );
   });
 
   const 魔力信息 = computed(() => {
-    检查状态更新()
+    检查状态更新();
     return {
       当前: 领主.value?.获取属性('魔力') ?? 0,
       最大: 领主.value?.获取属性('最大魔力') ?? 100,
-      百分比: 领主.value?.获取魔力百分比() ?? 0
-    }
+      百分比: 领主.value?.获取魔力百分比() ?? 0,
+    };
   });
 
   const 喽啰总数 = computed(() => {
-    检查状态更新()
-    return 游戏实例.value?.喽啰池管理.获取喽啰总数() ?? 0
+    检查状态更新();
+    return 游戏实例.value?.喽啰池管理.获取喽啰总数() ?? 0;
   });
 
   const 已发布任务列表 = computed(() => {
-    检查状态更新()
-    return 游戏实例.value?.获取任务管理器().获取已发布任务列表() ?? []
+    检查状态更新();
+    return 游戏实例.value?.获取任务管理器().获取已发布任务列表() ?? [];
   });
 
   // ─── 选中实体 ───
   const 选中的冠军 = computed(() => {
-    检查状态更新()
+    检查状态更新();
     if (选中实体类型.value !== '冠军' || !选中实体ID.value) return null;
     return 游戏实例.value?.获取冠军(选中实体ID.value) ?? null;
   });
 
   const 选中的母畜 = computed(() => {
-    检查状态更新()
+    检查状态更新();
     if (选中实体类型.value !== '母畜' || !选中实体ID.value) return null;
     return 游戏实例.value?.获取母畜(选中实体ID.value) ?? null;
   });
 
   const 选中的地点 = computed(() => {
-    检查状态更新()
+    检查状态更新();
     if (选中实体类型.value !== '地点' || !选中实体ID.value) return null;
     return 游戏实例.value?.获取地点(选中实体ID.value) ?? null;
   });
+
+  // 任务选择状态
+  const 任务选择状态 = reactive({
+    isSelecting: false,
+    taskId: null as string | null,
+    targetType: null as string | null,
+    availableTargets: [] as Array<{ id: string; name: string; type: string }>,
+    selectedTarget: null as string | null,
+    assignerId: null as string | null,
+  });
+
+  // 获取任务可选目标
+  const getTaskTargets = (taskId: string, assignerId: string) => {
+    const taskManager = 游戏实例.value?.获取任务管理器();
+    if (!taskManager) return [];
+
+    const config = taskManager.获取任务配置(taskId) as TaskConfig;
+    const result: { id: string; name: string; type: string }[] = [];
+
+    if (config.目标实体类型 === '冠军实体') {
+      所有冠军.value.forEach(c => {
+        result.push({ id: c.实体ID, name: c.获取属性('姓名'), type: '冠军' });
+      });
+    }
+
+    if (config.目标实体类型 === '母畜实体') {
+      所有母畜.value
+        .filter(m => m.实体ID !== assignerId) // 排除自己
+        .forEach(m => {
+          result.push({ id: m.实体ID, name: m.获取属性('姓名'), type: '母畜' });
+        });
+    }
+
+    if (config.目标实体类型 === '地点实体' || config.目标实体类型 === '可袭击地点实体') {
+      所有地点.value.forEach(l => {
+        result.push({ id: l.实体ID, name: l.地点名称, type: '地点' });
+      });
+    }
+
+    return result;
+  };
+
+  // 开始任务目标选择
+  const 开始任务目标选择 = (taskId: string, assignerId: string) => {
+    任务选择状态.isSelecting = true;
+    任务选择状态.taskId = taskId;
+    任务选择状态.assignerId = assignerId;
+    任务选择状态.selectedTarget = null;
+    任务选择状态.availableTargets = getTaskTargets(taskId, assignerId);
+  };
+
+  // 选择目标并发布任务
+  const 选择目标并发布任务 = (targetId: string) => {
+    if (!任务选择状态.taskId || !任务选择状态.assignerId) return;
+
+    发布任务(任务选择状态.taskId, 任务选择状态.assignerId, targetId);
+
+    // 重置状态
+    resetTaskSelection();
+  };
+
+  // 直接发布无目标任务
+  const 直接发布无目标任务 = (taskId: string, assignerId: string) => {
+    发布任务(taskId, assignerId);
+  };
+
+  // 取消任务选择
+  const 取消任务选择 = () => {
+    resetTaskSelection();
+  };
+
+  // 重置任务选择状态
+  const resetTaskSelection = () => {
+    任务选择状态.isSelecting = false;
+    任务选择状态.taskId = null;
+    任务选择状态.targetType = null;
+    任务选择状态.availableTargets = [];
+    任务选择状态.selectedTarget = null;
+    任务选择状态.assignerId = null;
+  };
 
   // ─── 操作方法 ───
   function 选择实体(实体ID: string, 类型: '冠军' | '母畜' | '地点') {
@@ -166,15 +253,15 @@ export const useGameStore = defineStore('game', () => {
     选中实体类型.value = null;
   }
 
-  function 切换面板(panelId: string): void{
-    检查状态更新()
+  function 切换面板(panelId: string): void {
+    检查状态更新();
     当前面板.value = panelId;
     清除选择();
   }
 
   // ─── 任务系统 ───
   function 发布任务(任务名: string, 执行人ID: string, 目标ID?: string) {
-    更新通用状态()
+    更新通用状态();
     if (!游戏实例.value) return { 成功: false, 原因: '游戏未初始化' };
 
     const 执行人 = 游戏实例.value.实体管理.获取实体(执行人ID);
@@ -182,11 +269,7 @@ export const useGameStore = defineStore('game', () => {
 
     if (!执行人) return { 成功: false, 原因: '执行人不存在' };
 
-    const 结果 = 游戏实例.value.获取任务管理器().发布任务(
-      任务名,
-      执行人 as any,
-      目标 as any
-    );
+    const 结果 = 游戏实例.value.获取任务管理器().发布任务(任务名, 执行人 as any, 目标 as any);
 
     if (结果.成功) {
       添加通知('success', `任务「${任务名}」已发布`);
@@ -198,7 +281,7 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function 取消任务(任务ID: string) {
-    更新通用状态() // 使用通用更新
+    更新通用状态(); // 使用通用更新
     if (!游戏实例.value) return;
 
     const 结果 = 游戏实例.value.获取任务管理器().取消任务(任务ID);
@@ -210,15 +293,11 @@ export const useGameStore = defineStore('game', () => {
 
   // ─── 法术系统 ───
   function 使用法术(法术名: string, 倍率: number, 目标ID?: string) {
-    更新通用状态() // 使用通用更新
+    更新通用状态(); // 使用通用更新
     if (!游戏实例.value) return { 成功: false, 原因: '游戏未初始化' };
 
     const 目标 = 目标ID ? 游戏实例.value.实体管理.获取实体(目标ID) : null;
-    const 结果 = 游戏实例.value.获取法术管理器().使用法术(
-      法术名,
-      倍率,
-      目标 as any
-    );
+    const 结果 = 游戏实例.value.获取法术管理器().使用法术(法术名, 倍率, 目标 as any);
 
     if (结果.成功) {
       添加通知('success', `法术「${法术名}」施放成功`);
@@ -232,15 +311,11 @@ export const useGameStore = defineStore('game', () => {
   // ─── 黑市系统 ───
 
   function 购买商品(商品名: string, 数量: number, 目标ID?: string) {
-    更新通用状态() // 使用通用更新
+    更新通用状态(); // 使用通用更新
     if (!游戏实例.value) return { 成功: false, 原因: '游戏未初始化' };
 
     const 目标 = 目标ID ? 游戏实例.value.实体管理.获取实体(目标ID) : null;
-    const 结果 = 游戏实例.value.获取黑市管理器().购买商品(
-      商品名,
-      数量,
-      目标 as any
-    );
+    const 结果 = 游戏实例.value.获取黑市管理器().购买商品(商品名, 数量, 目标 as any);
 
     if (结果.成功) {
       添加通知('success', `成功购买「${商品名}」×${数量}`);
@@ -252,7 +327,7 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function 购买奴隶(商品ID: string) {
-    更新母畜列表()
+    更新母畜列表();
     if (!游戏实例.value) return { 成功: false, 原因: '游戏未初始化' };
 
     const 结果 = 游戏实例.value.获取黑市管理器().购买奴隶(商品ID);
@@ -273,13 +348,13 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function 添加出战将领(将领ID: string) {
-    更新冠军列表()
+    更新冠军列表();
     if (!游戏实例.value) return { 成功: false };
     return 游戏实例.value.获取战斗管理器().添加出战将领(将领ID);
   }
 
   function 移除出战将领(将领ID: string) {
-    更新冠军列表()
+    更新冠军列表();
     if (!游戏实例.value) return { 成功: false };
     return 游戏实例.value.获取战斗管理器().移除出战将领(将领ID);
   }
@@ -299,7 +374,7 @@ export const useGameStore = defineStore('game', () => {
 
   // ─── 回合系统 ───
   function 结束回合() {
-    更新通用状态() // 使用通用更新
+    更新通用状态(); // 使用通用更新
     if (!游戏实例.value) return;
 
     const 摘要 = 游戏实例.value.结束回合();
@@ -318,7 +393,7 @@ export const useGameStore = defineStore('game', () => {
       id: ++通知计数器,
       类型,
       消息,
-      时间戳: Date.now()
+      时间戳: Date.now(),
     };
     通知列表.value.push(通知);
 
@@ -336,46 +411,46 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function 获取姓名(id: string): string {
-    const 游戏实体 = 游戏实例.value?.实体管理.获取实体(id)
+    const 游戏实体 = 游戏实例.value?.实体管理.获取实体(id);
     switch (游戏实体?.实体类型) {
       case '冠军实体':
-        const 冠军 = 游戏实体 as 冠军实体
-        return 冠军.获取属性('姓名')
+        const 冠军 = 游戏实体 as 冠军实体;
+        return 冠军.获取属性('姓名');
       case '母畜实体':
-        const 母畜 = 游戏实体 as 母畜实体
-        return 母畜.获取属性('姓名')
+        const 母畜 = 游戏实体 as 母畜实体;
+        return 母畜.获取属性('姓名');
       case '领主实体':
-        const 领主 = 游戏实体 as 领主实体
-        return 领主.获取属性('姓名')
+        const 领主 = 游戏实体 as 领主实体;
+        return 领主.获取属性('姓名');
       default:
-        return '未知'
+        return '未知';
     }
   }
 
   function 自动分配喽啰(): void {
-    更新喽啰状态()
-    const 结果 = 游戏实例.value?.喽啰池管理.自动分配()
+    更新喽啰状态();
+    const 结果 = 游戏实例.value?.喽啰池管理.自动分配();
   }
 
   function 清空将领喽啰(championId: string): void {
-    更新喽啰状态()
-    游戏实例.value?.获取实体管理器().清空将领喽啰池(championId)
+    更新喽啰状态();
+    游戏实例.value?.获取实体管理器().清空将领喽啰池(championId);
   }
 
   function 填满将领喽啰(championId: string): void {
-    更新喽啰状态()
-    游戏实例.value?.获取实体管理器().快速填充到上限(championId)
+    更新喽啰状态();
+    游戏实例.value?.获取实体管理器().快速填充到上限(championId);
   }
 
-  function 清空所有喽啰(): void{
-    更新喽啰状态()
-    游戏实例.value?.喽啰池管理.清空所有将领喽啰池()
+  function 清空所有喽啰(): void {
+    更新喽啰状态();
+    游戏实例.value?.喽啰池管理.清空所有将领喽啰池();
   }
 
   // ========== 任务系统 ==========
 
-  function 检查实体是否有任务(entityId: string): boolean{
-    return 游戏实例.value?.获取任务管理器().是否被占用(entityId) ?? false
+  function 检查实体是否有任务(entityId: string): boolean {
+    return 游戏实例.value?.获取任务管理器().是否被占用(entityId) ?? false;
   }
 
   /**
@@ -410,7 +485,7 @@ export const useGameStore = defineStore('game', () => {
     return {
       任务名: 预选任务名.value,
       执行人ID: 预选执行人ID.value,
-      目标ID: 预选目标ID.value
+      目标ID: 预选目标ID.value,
     };
   }
 
@@ -422,16 +497,16 @@ export const useGameStore = defineStore('game', () => {
    * @returns { 当前进度: number, 最大进度: number, 百分比: number } | null
    */
   function 获取地点侦查进度(locationId: string): {
-    当前进度: number
-    最大进度: number
-    百分比: number
-  } | null{
-    检查状态更新()
-    const 地点 = 游戏实例.value?.获取实体管理器().获取地点(locationId)
-    if (!地点) return null
-    const 当前进度 = 地点.侦察进度
-    const 最大进度 = 地点.侦察最大值
-    return { 当前进度, 最大进度, 百分比: 当前进度 / 最大进度 }
+    当前进度: number;
+    最大进度: number;
+    百分比: number;
+  } | null {
+    检查状态更新();
+    const 地点 = 游戏实例.value?.获取实体管理器().获取地点(locationId);
+    if (!地点) return null;
+    const 当前进度 = 地点.侦察进度;
+    const 最大进度 = 地点.侦察最大值;
+    return { 当前进度, 最大进度, 百分比: (当前进度 / 最大进度) * 100 };
   }
 
   /**
@@ -440,22 +515,22 @@ export const useGameStore = defineStore('game', () => {
    * @returns 已发现母畜信息数组
    */
   function 获取地点已发现母畜(locationId: string): Array<{
-    id: string
-    name: string
-    race: string
-    fertility: number
-    appeal: number
-  }> | null{
-    检查状态更新()
-    const 地点 = 游戏实例.value?.获取实体管理器().获取地点(locationId)
-    if (!地点) return null
+    id: string;
+    name: string;
+    race: string;
+    fertility: number;
+    appeal: number;
+  }> | null {
+    检查状态更新();
+    const 地点 = 游戏实例.value?.获取实体管理器().获取地点(locationId);
+    if (!地点) return null;
     const reslut: Array<{
-      id: string
-      name: string
-      race: string
-      fertility: number
-      appeal: number
-    }> = []
+      id: string;
+      name: string;
+      race: string;
+      fertility: number;
+      appeal: number;
+    }> = [];
     地点.已侦察母畜.forEach(母畜 => {
       reslut.push({
         id: 母畜.实体ID,
@@ -463,8 +538,8 @@ export const useGameStore = defineStore('game', () => {
         race: 母畜.获取属性('种族'),
         fertility: 母畜.获取属性('总生育力'),
         appeal: 母畜.获取属性('魅力'),
-      })
-    })
+      });
+    });
     return reslut;
   }
 
@@ -473,16 +548,16 @@ export const useGameStore = defineStore('game', () => {
    * @param locationId 地点实体ID
    * @returns 未发现数量，如果完全未侦查返回 null
    */
-  function 获取地点未发现母畜数量(locationId: string): number | null{
-    检查状态更新()
-    const 地点 = 游戏实例.value?.获取实体管理器().获取地点(locationId)
-    if (!地点) return null
+  function 获取地点未发现母畜数量(locationId: string): number | null {
+    检查状态更新();
+    const 地点 = 游戏实例.value?.获取实体管理器().获取地点(locationId);
+    if (!地点) return null;
     return 地点.获取潜在母畜数量();
   }
 
   // ─── 存档系统 ───
   function 保存游戏(槽位: number) {
-    更新通用状态() // 使用通用更新
+    更新通用状态(); // 使用通用更新
     if (!游戏实例.value) return { 成功: false };
     const 结果 = 游戏实例.value.获取存档管理器().保存游戏(游戏实例.value, 槽位);
     if (结果.成功) {
@@ -492,7 +567,7 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function 加载游戏(槽位: number) {
-    更新通用状态() // 使用通用更新
+    更新通用状态(); // 使用通用更新
     if (!游戏实例.value) return { 成功: false };
     const 结果 = 游戏实例.value.获取存档管理器().加载存档(槽位, 游戏实例.value);
     if (结果.成功) {
@@ -528,6 +603,7 @@ export const useGameStore = defineStore('game', () => {
     选中的冠军,
     选中的母畜,
     选中的地点,
+    任务选择状态,
 
     // 方法
     初始化,
@@ -561,6 +637,10 @@ export const useGameStore = defineStore('game', () => {
     预选任务,
     清除预选任务,
     获取预选任务,
+    开始任务目标选择,
+    选择目标并发布任务,
+    直接发布无目标任务,
+    取消任务选择,
     获取地点侦查进度,
     获取地点已发现母畜,
     获取地点未发现母畜数量,
@@ -568,7 +648,6 @@ export const useGameStore = defineStore('game', () => {
     加载游戏,
   };
 });
-
 
 // 购买商品,
 // 切换面板,

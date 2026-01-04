@@ -128,6 +128,9 @@ def check_src_directory():
     return True
 
 def main():
+    target = sys.argv[1] if len(sys.argv) > 1 else "ts"
+    target = f"*.{target.lstrip('*.')}"
+    
     """主函数"""
     print("=" * 60)
     print("src_out.py - 导出目录结构和.ts文件内容")
@@ -146,11 +149,11 @@ def main():
         print("警告: 目录结构写入失败，继续处理...")
     
     # 步骤3: 处理.ts文件
-    if not process_ts_files("*.vue"):
+    if not process_ts_files(target):
         print("警告: .ts文件处理过程中出现错误")
     
     # 显示结果
-    output_file = Path("./out.txt")
+    output_file = Path("./out.local")
     if output_file.exists():
         file_size = output_file.stat().st_size
         print(f"\n{'=' * 60}")

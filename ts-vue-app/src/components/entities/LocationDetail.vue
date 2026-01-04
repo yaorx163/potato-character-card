@@ -1,129 +1,124 @@
 <!-- components/entities/LocationDetail.vue -->
 <!-- 介绍：地点详情 - 改进版，增加侦查信息显示 -->
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useGameStore } from '@/stores/gameStore'
+import { useGameStore } from '@/stores/gameStore';
+import { computed } from 'vue';
 
-const store = useGameStore()
-const location = computed(() => store.选中的地点)
+const store = useGameStore();
+const location = computed(() => store.选中的地点);
 
 // 地点类型图标映射
 const typeIconMap: Record<string, string> = {
-  '村庄': '🏘',
-  '城镇': '🏰',
-  '要塞': '⚔',
-  '矿洞': '⛏',
-  '森林': '🌲',
-  '洞穴': '🕳',
-  '神殿': '⛩',
-  '商队': '🐎',
-  '默认': '⚑'
-}
+  村庄: '🏘',
+  城镇: '🏰',
+  要塞: '⚔',
+  矿洞: '⛏',
+  森林: '🌲',
+  洞穴: '🕳',
+  神殿: '⛩',
+  商队: '🐎',
+  默认: '⚑',
+};
 
 // 威胁等级
 const threatLevel = computed(() => {
-  if (!location.value) return null
-  const power = location.value.获取战斗力估值?.()
+  if (!location.value) return null;
+  const power = location.value.获取战斗力估值?.();
   if (power === null || power === undefined) {
-    return { label: '未知', color: 'var(--text-dim)', icon: '?' }
+    return { label: '未知', color: 'var(--text-dim)', icon: '?' };
   }
   if (power >= 500) {
-    return { label: '极高', color: 'var(--danger)', icon: '☠☠☠' }
+    return { label: '极高', color: 'var(--danger)', icon: '☠☠☠' };
   }
   if (power >= 300) {
-    return { label: '高', color: 'var(--accent-blood)', icon: '☠☠' }
+    return { label: '高', color: 'var(--accent-blood)', icon: '☠☠' };
   }
   if (power >= 150) {
-    return { label: '中等', color: 'var(--warning)', icon: '☠' }
+    return { label: '中等', color: 'var(--warning)', icon: '☠' };
   }
   if (power >= 50) {
-    return { label: '低', color: 'var(--accent-poison)', icon: '!' }
+    return { label: '低', color: 'var(--accent-poison)', icon: '!' };
   }
-  return { label: '微弱', color: 'var(--text-dim)', icon: '-' }
-})
+  return { label: '微弱', color: 'var(--text-dim)', icon: '-' };
+});
 
 // 侦查信息
 const scoutInfo = computed(() => {
-  if (!location.value) return null
+  if (!location.value) return null;
 
   // gameStore方法：获取地点的侦查进度信息
   // 返回 { 当前进度: number, 最大进度: number, 百分比: number }
-  const progress = store.获取地点侦查进度(location.value.实体ID)
+  const progress = store.获取地点侦查进度(location.value.实体ID);
 
   return {
     progress: progress?.当前进度 ?? 0,
     maxProgress: progress?.最大进度 ?? 100,
     percentage: progress?.百分比 ?? 0,
-    isComplete: (progress?.百分比 ?? 0) >= 100
-  }
-})
+    isComplete: (progress?.百分比 ?? 0) >= 100,
+  };
+});
 
 // 已发现的母畜
 const discoveredBreedingStock = computed(() => {
-  if (!location.value) return []
+  if (!location.value) return [];
 
   // gameStore方法：获取在该地点已发现的母畜列表
   // 返回 { id: string, name: string, race: string, fertility: number }[]
-  return store.获取地点已发现母畜(location.value.实体ID) ?? []
-})
+  return store.获取地点已发现母畜(location.value.实体ID) ?? [];
+});
 
 // 未发现的母畜数量
 const undiscoveredCount = computed(() => {
-  if (!location.value) return null
+  if (!location.value) return null;
 
   // gameStore方法：获取该地点尚未侦查到的母畜数量
   // 如果完全未侦查，返回 null（显示为 ???）
-  return store.获取地点未发现母畜数量(location.value.实体ID)
-})
+  return store.获取地点未发现母畜数量(location.value.实体ID);
+});
 
 // 地点信息
 const locationInfo = computed(() => {
-  if (!location.value) return []
-  const info: { label: string; value: string | number }[] = []
+  if (!location.value) return [];
+  const info: { label: string; value: string | number }[] = [];
 
-  info.push({ label: '类型', value: location.value.地点类型 })
+  info.push({ label: '类型', value: location.value.地点类型 });
 
-  const power = location.value.获取战斗力估值?.()
+  const power = location.value.获取战斗力估值?.();
   if (power !== null && power !== undefined) {
-    info.push({ label: '战斗力', value: Math.round(power) })
+    info.push({ label: '战斗力', value: Math.round(power) });
   }
 
-  const 状态 = location.value.获取属性?.('状态')
-  if (状态) {
-    info.push({ label: '状态', value: 状态 })
-  }
-
-  return info
-})
+  return info;
+});
 
 // 是否已选为战斗目标
 const isSelectedAsTarget = computed(() => {
-  if (!location.value) return false
-  const combatManager = store.游戏实例?.获取战斗管理器()
-  return combatManager?.获取选定目标()?.实体ID === location.value.实体ID
-})
+  if (!location.value) return false;
+  const combatManager = store.游戏实例?.获取战斗管理器();
+  return combatManager?.获取选定目标()?.实体ID === location.value.实体ID;
+});
 
 // 是否可攻击
 const canAttack = computed(() => {
-  if (!location.value) return false
-  const 状态 = location.value.获取属性?.('状态')
-  return 状态 !== '已攻占' && 状态 !== '废墟'
-})
+  if (!location.value) return false;
+  const 状态 = location.value.获取属性?.('状态');
+  return 状态 !== '已攻占' && 状态 !== '废墟';
+});
 
 function selectAsTarget() {
-  if (!location.value) return
-  store.选择战斗目标(location.value.实体ID)
+  if (!location.value) return;
+  store.选择战斗目标(location.value.实体ID);
 }
 
 function deselectTarget() {
-  store.游戏实例?.获取战斗管理器()?.取消目标选择()
+  store.游戏实例?.获取战斗管理器()?.取消目标选择();
 }
 
 function assignScoutTask() {
-  if (!location.value) return
+  if (!location.value) return;
   // 跳转到任务面板并预选侦查任务
-  store.预选任务('侦查', undefined, location.value.实体ID)
-  store.切换面板('tasks')
+  store.预选任务('侦查', undefined, location.value.实体ID);
+  store.切换面板('tasks');
 }
 </script>
 
@@ -156,7 +151,7 @@ function assignScoutTask() {
           <span class="scout-icon">👁</span>
           侦查进度
         </span>
-        <span class="scout-percentage" :class="{ 'complete': scoutInfo?.isComplete }">
+        <span class="scout-percentage" :class="{ complete: scoutInfo?.isComplete }">
           {{ scoutInfo?.percentage ?? 0 }}%
         </span>
       </div>
@@ -165,29 +160,19 @@ function assignScoutTask() {
         <div
           class="scout-bar__fill"
           :style="{ width: (scoutInfo?.percentage ?? 0) + '%' }"
-          :class="{ 'complete': scoutInfo?.isComplete }"
+          :class="{ complete: scoutInfo?.isComplete }"
         />
       </div>
 
       <div class="scout-detail">
         <span>{{ scoutInfo?.progress ?? 0 }} / {{ scoutInfo?.maxProgress ?? 100 }}</span>
-        <button
-          v-if="!scoutInfo?.isComplete"
-          class="btn btn--small"
-          @click="assignScoutTask"
-        >
-          派遣侦查
-        </button>
+        <button v-if="!scoutInfo?.isComplete" class="btn btn--small" @click="assignScoutTask">派遣侦查</button>
       </div>
     </div>
 
     <!-- 地点信息 -->
     <div class="info-list">
-      <div
-        v-for="info in locationInfo"
-        :key="info.label"
-        class="info-row"
-      >
+      <div v-for="info in locationInfo" :key="info.label" class="info-row">
         <span class="info-row__label">{{ info.label }}</span>
         <span class="info-row__value">{{ info.value }}</span>
       </div>
@@ -202,9 +187,7 @@ function assignScoutTask() {
           <template v-if="undiscoveredCount !== null">
             / {{ discoveredBreedingStock.length + undiscoveredCount }}
           </template>
-          <template v-else>
-            / ???
-          </template>
+          <template v-else> / ??? </template>
         </span>
       </div>
 
@@ -215,19 +198,13 @@ function assignScoutTask() {
       </div>
 
       <div v-else class="broodmother-list">
-        <div
-          v-for="bm in discoveredBreedingStock"
-          :key="bm.id"
-          class="broodmother-item"
-        >
+        <div v-for="bm in discoveredBreedingStock" :key="bm.id" class="broodmother-item">
           <div class="bm-main">
             <span class="bm-name">{{ bm.name }}</span>
             <span class="bm-race">{{ bm.race }}</span>
           </div>
           <div class="bm-stats">
-            <span class="bm-stat" title="生育力">
-              ♀ {{ bm.fertility }}
-            </span>
+            <span class="bm-stat" title="生育力"> ♀ {{ bm.fertility }} </span>
           </div>
         </div>
       </div>
@@ -252,24 +229,12 @@ function assignScoutTask() {
     <!-- 操作区 -->
     <div class="detail-actions">
       <template v-if="canAttack">
-        <button
-          v-if="!isSelectedAsTarget"
-          class="btn btn--primary action-btn"
-          @click="selectAsTarget"
-        >
+        <button v-if="!isSelectedAsTarget" class="btn btn--primary action-btn" @click="selectAsTarget">
           <span>⚔</span> 选为目标
         </button>
-        <button
-          v-else
-          class="btn action-btn"
-          @click="deselectTarget"
-        >
-          取消选择
-        </button>
+        <button v-else class="btn action-btn" @click="deselectTarget">取消选择</button>
       </template>
-      <div v-else class="cannot-attack">
-        此地点无法攻击
-      </div>
+      <div v-else class="cannot-attack">此地点无法攻击</div>
     </div>
   </div>
 </template>

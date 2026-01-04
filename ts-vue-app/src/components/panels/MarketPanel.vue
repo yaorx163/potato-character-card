@@ -1,55 +1,58 @@
 <!-- components/panels/MarketPanel.vue -->
 <!-- 介绍：黑市面板 - 改进版，支持购买时选择目标 -->
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { useGameStore } from '@/stores/gameStore'
+import { useGameStore } from '@/stores/gameStore';
+import { computed, ref } from 'vue';
 
-const store = useGameStore()
+const store = useGameStore();
 
-type MarketTab = 'goods' | 'slaves'
-const activeTab = ref<MarketTab>('goods')
+type MarketTab = 'goods' | 'slaves';
+const activeTab = ref<MarketTab>('goods');
 
 // 目标选择状态
-const selectingTargetFor = ref<string | null>(null) // 商品名或奴隶ID
-const selectedTarget = ref<string | null>(null)
+const selectingTargetFor = ref<string | null>(null); // 商品名或奴隶ID
+const selectedTarget = ref<string | null>(null);
 
-const marketManager = computed(() => store.游戏实例?.获取黑市管理器())
+const marketManager = computed(() => store.游戏实例?.获取黑市管理器());
 
 interface GoodsConfig {
-  价格?: number
-  描述?: string
-  需要目标?: boolean
-  目标类型?: string[]
-  每回合限购?: number
+  价格?: number;
+  描述?: string;
+  需要目标?: boolean;
+  目标类型?: string[];
+  每回合限购?: number;
 }
 
-const allGoods = computed(() =>
-  marketManager.value?.获取所有商品名().map(name => {
-    const config = marketManager.value?.获取商品配置(name) as GoodsConfig | undefined
-    return {
-      name,
-      config,
-      remaining: marketManager.value?.获取商品可购买数量(name) ?? 0,
-      needsTarget: config?.需要目标 ?? false
-    }
-  }) ?? []
-)
+const allGoods = computed(
+  () =>
+    marketManager.value?.获取所有商品名().map(name => {
+      const config = marketManager.value?.获取商品配置(name) as GoodsConfig | undefined;
+      return {
+        name,
+        config,
+        remaining: marketManager.value?.获取商品可购买数量(name) ?? 0,
+        needsTarget: config?.需要目标 ?? false,
+      };
+    }) ?? [],
+);
 
-const slaves = computed(() =>
-  marketManager.value?.获取奴隶货架() ?? []
-)
+const slaves = computed(() => {
+  // store.检查状态更新();
+  console.log(marketManager.value?.获取奴隶货架());
+  return marketManager.value?.获取奴隶货架() ?? [];
+});
 
-const currentMilk = computed(() => store.资源状态.催淫母乳)
+const currentMilk = computed(() => store.资源状态.催淫母乳);
 
 // 获取可选目标列表
 const availableTargets = computed(() => {
-  if (!selectingTargetFor.value) return []
+  if (!selectingTargetFor.value) return [];
 
   // 尝试获取商品配置
-  const goods = allGoods.value.find(g => g.name === selectingTargetFor.value)
-  const targetTypes = goods?.config?.目标类型 ?? ['母畜实体', '冠军实体']
+  const goods = allGoods.value.find(g => g.name === selectingTargetFor.value);
+  const targetTypes = goods?.config?.目标类型 ?? ['母畜实体', '冠军实体'];
 
-  const result: { id: string; name: string; type: string; info?: string }[] = []
+  const result: { id: string; name: string; type: string; info?: string }[] = [];
 
   if (targetTypes.includes('母畜实体')) {
     store.所有母畜.forEach(m => {
@@ -57,9 +60,9 @@ const availableTargets = computed(() => {
         id: m.实体ID,
         name: m.获取属性('姓名'),
         type: '母畜',
-        info: `臣服度: ${m.获取属性('臣服度')}`
-      })
-    })
+        info: `臣服度: ${m.获取属性('臣服度')}`,
+      });
+    });
   }
 
   if (targetTypes.includes('冠军实体')) {
@@ -67,9 +70,9 @@ const availableTargets = computed(() => {
       result.push({
         id: c.实体ID,
         name: c.获取属性('姓名'),
-        type: '冠军'
-      })
-    })
+        type: '冠军',
+      });
+    });
   }
 
   if (targetTypes.includes('地点实体')) {
@@ -77,44 +80,44 @@ const availableTargets = computed(() => {
       result.push({
         id: l.实体ID,
         name: l.地点名称,
-        type: '地点'
-      })
-    })
+        type: '地点',
+      });
+    });
   }
 
-  return result
-})
+  return result;
+});
 
 // 检查商品是否需要目标
 function checkAndBuyGoods(goodsName: string) {
-  const goods = allGoods.value.find(g => g.name === goodsName)
+  const goods = allGoods.value.find(g => g.name === goodsName);
   if (goods?.needsTarget) {
-    selectingTargetFor.value = goodsName
-    selectedTarget.value = null
+    selectingTargetFor.value = goodsName;
+    selectedTarget.value = null;
   } else {
-    store.购买商品(goodsName, 1)
+    store.购买商品(goodsName, 1);
   }
 }
 
 // 确认购买（带目标）
 function confirmPurchase() {
-  if (!selectingTargetFor.value) return
+  if (!selectingTargetFor.value) return;
 
   // gameStore方法：购买商品并指定目标
-  store.购买商品(selectingTargetFor.value, 1, selectedTarget.value ?? undefined)
+  store.购买商品(selectingTargetFor.value, 1, selectedTarget.value ?? undefined);
 
-  selectingTargetFor.value = null
-  selectedTarget.value = null
+  selectingTargetFor.value = null;
+  selectedTarget.value = null;
 }
 
 // 取消选择
 function cancelSelection() {
-  selectingTargetFor.value = null
-  selectedTarget.value = null
+  selectingTargetFor.value = null;
+  selectedTarget.value = null;
 }
 
 function buySlave(slaveId: string) {
-  store.购买奴隶(slaveId)
+  store.购买奴隶(slaveId);
 }
 </script>
 
@@ -149,31 +152,19 @@ function buySlave(slaveId: string) {
             </div>
             <span v-if="target.info" class="target-info">{{ target.info }}</span>
           </button>
-          <div v-if="availableTargets.length === 0" class="no-target">
-            无可用目标
-          </div>
+          <div v-if="availableTargets.length === 0" class="no-target">无可用目标</div>
         </div>
 
         <div class="modal-actions">
           <button class="btn" @click="cancelSelection">取消</button>
-          <button
-            class="btn btn--primary"
-            @click="confirmPurchase"
-            :disabled="!selectedTarget"
-          >
-            确认购买
-          </button>
+          <button class="btn btn--primary" @click="confirmPurchase" :disabled="!selectedTarget">确认购买</button>
         </div>
       </div>
     </div>
 
     <!-- 子标签 -->
     <div class="market-tabs">
-      <button
-        class="market-tab"
-        :class="{ 'market-tab--active': activeTab === 'goods' }"
-        @click="activeTab = 'goods'"
-      >
+      <button class="market-tab" :class="{ 'market-tab--active': activeTab === 'goods' }" @click="activeTab = 'goods'">
         常驻商品
       </button>
       <button
@@ -187,11 +178,7 @@ function buySlave(slaveId: string) {
 
     <!-- 商品列表 -->
     <div v-if="activeTab === 'goods'" class="goods-list">
-      <div
-        v-for="goods in allGoods"
-        :key="goods.name"
-        class="goods-item"
-      >
+      <div v-for="goods in allGoods" :key="goods.name" class="goods-item">
         <div class="goods-item__info">
           <div class="goods-header">
             <span class="goods-name">{{ goods.name }}</span>
@@ -214,15 +201,9 @@ function buySlave(slaveId: string) {
 
     <!-- 奴隶列表 -->
     <div v-else class="slave-list">
-      <div v-if="slaves.length === 0" class="empty-hint">
-        本周无奴隶出售
-      </div>
+      <div v-if="slaves.length === 0" class="empty-hint">本周无奴隶出售</div>
 
-      <div
-        v-for="slave in slaves"
-        :key="slave.商品ID"
-        class="slave-item"
-      >
+      <div v-for="slave in slaves" :key="slave.商品ID" class="slave-item">
         <div class="slave-item__info">
           <span class="slave-name">{{ slave.母畜实体.获取属性('姓名') }}</span>
           <span class="slave-detail">
@@ -230,8 +211,7 @@ function buySlave(slaveId: string) {
             {{ slave.母畜实体.获取属性('原身份') }}
           </span>
           <span class="slave-stats">
-            育力: {{ slave.母畜实体.获取属性('总生育力') }} ·
-            魅力: {{ slave.母畜实体.获取属性('魅力') }}
+            育力: {{ slave.母畜实体.获取属性('总生育力') }} · 魅力: {{ slave.母畜实体.获取属性('魅力') }}
           </span>
         </div>
         <div class="slave-item__action">

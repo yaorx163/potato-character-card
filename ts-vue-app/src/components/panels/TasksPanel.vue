@@ -1,125 +1,125 @@
 <!-- components/panels/TasksPanel.vue -->
 <!-- 介绍：任务面板 - 改进版，支持任务目标选择和任务详情显示 -->
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
-import { useGameStore } from '@/stores/gameStore'
+import { useGameStore } from '@/stores/gameStore';
+import { computed, onMounted, ref, watch } from 'vue';
 
-const store = useGameStore()
+const store = useGameStore();
 
 // 任务配置类型
 interface TaskConfig {
-  描述?: string
-  行动力消耗?: number
-  需要目标?: boolean
-  执行人实体类型?: string[]
-  目标实体类型?: string[]
+  描述?: string;
+  行动力消耗?: number;
+  需要目标?: boolean;
+  执行人实体类型?: string;
+  目标实体类型?: string;
 }
 
 const availableTasks = computed(() => {
-  const taskManager = store.游戏实例?.获取任务管理器()
-  if (!taskManager) return []
+  const taskManager = store.游戏实例?.获取任务管理器();
+  if (!taskManager) return [];
 
   return taskManager.获取所有任务名().map(name => ({
     name,
-    config: taskManager.获取任务配置(name) as TaskConfig | undefined
-  }))
-})
+    config: taskManager.获取任务配置(name) as TaskConfig | undefined,
+  }));
+});
 
-const selectedTask = ref<string | null>(null)
-const selectedExecutor = ref<string | null>(null)
-const selectedTarget = ref<string | null>(null)
+const selectedTask = ref<string | null>(null);
+const selectedExecutor = ref<string | null>(null);
+const selectedTarget = ref<string | null>(null);
 
 // ─── 消费预选任务 ───
 onMounted(() => {
-  应用预选任务()
-})
+  应用预选任务();
+});
 
 // 监听预选状态变化
 watch(
   () => store.预选任务名,
-  (newVal) => {
+  newVal => {
     if (newVal) {
-      应用预选任务()
+      应用预选任务();
     }
-  }
-)
+  },
+);
 
 function 应用预选任务() {
-  const 预选 = store.获取预选任务()
+  const 预选 = store.获取预选任务();
 
   if (预选.任务名) {
-    const taskExists = availableTasks.value.some(t => t.name === 预选.任务名)
+    const taskExists = availableTasks.value.some(t => t.name === 预选.任务名);
     if (taskExists) {
-      selectedTask.value = 预选.任务名
+      selectedTask.value = 预选.任务名;
     }
   }
 
   if (预选.执行人ID) {
     // 验证执行人是否可用
-    const executorValid = executors.value.some(e => e.id === 预选.执行人ID && !e.busy)
+    const executorValid = executors.value.some(e => e.id === 预选.执行人ID && !e.busy);
     if (executorValid) {
-      selectedExecutor.value = 预选.执行人ID
+      selectedExecutor.value = 预选.执行人ID;
     }
   }
 
   if (预选.目标ID) {
-    selectedTarget.value = 预选.目标ID
+    selectedTarget.value = 预选.目标ID;
   }
 
-  store.清除预选任务()
+  store.清除预选任务();
 }
 
 // 当前选中任务的配置
 const currentTaskConfig = computed(() => {
-  if (!selectedTask.value) return null
-  return availableTasks.value.find(t => t.name === selectedTask.value)?.config ?? null
-})
+  if (!selectedTask.value) return null;
+  return availableTasks.value.find(t => t.name === selectedTask.value)?.config ?? null;
+});
 
 // 是否需要目标
 const needsTarget = computed(() => {
-  const 目标实体类型 = currentTaskConfig.value?.目标实体类型
-  if (!目标实体类型) return false
-  return true
-})
+  const 目标实体类型 = currentTaskConfig.value?.目标实体类型;
+  if (!目标实体类型) return false;
+  return true;
+});
 
 // 根据任务配置筛选可用执行人
 const executors = computed(() => {
-  if (!selectedTask.value || !currentTaskConfig.value) return []
+  if (!selectedTask.value || !currentTaskConfig.value) return [];
 
-  const allowedTypes = currentTaskConfig.value.执行人实体类型 ?? ['冠军实体', '母畜实体']
-  const result: { id: string; name: string; type: string; busy: boolean }[] = []
+  const allowedTypes = currentTaskConfig.value.执行人实体类型 ?? '';
+  const result: { id: string; name: string; type: string; busy: boolean }[] = [];
 
-  if (allowedTypes.includes('冠军实体')) {
+  if (allowedTypes === '冠军实体') {
     store.所有冠军.forEach(c => {
       result.push({
         id: c.实体ID,
         name: c.获取属性('姓名'),
         type: '冠军',
-        busy: store.检查实体是否有任务(c.实体ID)
-      })
-    })
+        busy: store.检查实体是否有任务(c.实体ID),
+      });
+    });
   }
 
-  if (allowedTypes.includes('母畜实体')) {
+  if (allowedTypes === '母畜实体') {
     store.所有母畜.forEach(m => {
       result.push({
         id: m.实体ID,
         name: m.获取属性('姓名'),
         type: '母畜',
-        busy: store.检查实体是否有任务(m.实体ID)
-      })
-    })
+        busy: store.检查实体是否有任务(m.实体ID),
+      });
+    });
   }
 
-  return result
-})
+  return result;
+});
 
 // 根据任务配置筛选可用目标
 const targets = computed(() => {
-  if (!selectedTask.value || !currentTaskConfig.value || !needsTarget.value) return []
+  if (!selectedTask.value || !currentTaskConfig.value || !needsTarget.value) return [];
 
-  const allowedTypes = currentTaskConfig.value.目标实体类型 ?? ['母畜实体', '地点实体']
-  const result: { id: string; name: string; type: string; info?: string }[] = []
+  const allowedTypes = currentTaskConfig.value.目标实体类型 ?? ['母畜实体', '地点实体'];
+  const result: { id: string; name: string; type: string; info?: string }[] = [];
 
   if (allowedTypes.includes('母畜实体')) {
     store.所有母畜.forEach(m => {
@@ -127,9 +127,9 @@ const targets = computed(() => {
         id: m.实体ID,
         name: m.获取属性('姓名'),
         type: '母畜',
-        info: `臣服度: ${m.获取属性('臣服度')}`
-      })
-    })
+        info: `臣服度: ${m.获取属性('臣服度')}`,
+      });
+    });
   }
 
   if (allowedTypes.includes('地点实体')) {
@@ -138,9 +138,9 @@ const targets = computed(() => {
         id: l.实体ID,
         name: l.地点名称,
         type: '地点',
-        info: l.地点类型
-      })
-    })
+        info: l.地点类型,
+      });
+    });
   }
 
   if (allowedTypes.includes('冠军实体')) {
@@ -148,43 +148,39 @@ const targets = computed(() => {
       result.push({
         id: c.实体ID,
         name: c.获取属性('姓名'),
-        type: '冠军'
-      })
-    })
+        type: '冠军',
+      });
+    });
   }
 
-  return result
-})
+  return result;
+});
 
 // 重置选择（但保留预选目标的特殊处理）
 watch(selectedTask, (newVal, oldVal) => {
   // 只有在非预选触发时才重置
   if (oldVal !== null) {
-    selectedExecutor.value = null
-    selectedTarget.value = null
+    selectedExecutor.value = null;
+    selectedTarget.value = null;
   }
-})
+});
 
 // 是否可以发布
 const canPublish = computed(() => {
-  if (!selectedTask.value || !selectedExecutor.value) return false
-  if (needsTarget.value && !selectedTarget.value) return false
-  return true
-})
+  if (!selectedTask.value || !selectedExecutor.value) return false;
+  if (needsTarget.value && !selectedTarget.value) return false;
+  return true;
+});
 
 function publishTask() {
-  if (!canPublish.value) return
+  if (!canPublish.value) return;
 
-  store.发布任务(
-    selectedTask.value!,
-    selectedExecutor.value!,
-    selectedTarget.value ?? undefined
-  )
+  store.发布任务(selectedTask.value!, selectedExecutor.value!, selectedTarget.value ?? undefined);
 
   // 重置选择
-  selectedTask.value = null
-  selectedExecutor.value = null
-  selectedTarget.value = null
+  selectedTask.value = null;
+  selectedExecutor.value = null;
+  selectedTarget.value = null;
 }
 </script>
 
@@ -236,7 +232,7 @@ function publishTask() {
             class="executor-option"
             :class="{
               'executor-option--selected': selectedExecutor === exec.id,
-              'executor-option--busy': exec.busy
+              'executor-option--busy': exec.busy,
             }"
             :disabled="exec.busy"
             @click="selectedExecutor = exec.id"
@@ -273,11 +269,7 @@ function publishTask() {
         <span v-if="targets.length === 0" class="no-data">无可用目标</span>
       </div>
 
-      <button
-        class="btn btn--primary publish-btn"
-        :disabled="!canPublish"
-        @click="publishTask"
-      >
+      <button class="btn btn--primary publish-btn" :disabled="!canPublish" @click="publishTask">
         <span v-if="!selectedTask">请选择任务</span>
         <span v-else-if="!selectedExecutor">请选择执行人</span>
         <span v-else-if="needsTarget && !selectedTarget">请选择目标</span>
@@ -289,32 +281,19 @@ function publishTask() {
     <section class="panel-section">
       <h3 class="section-title">已发布任务 ({{ store.已发布任务列表.length }})</h3>
 
-      <div v-if="store.已发布任务列表.length === 0" class="empty-hint">
-        暂无待执行任务
-      </div>
+      <div v-if="store.已发布任务列表.length === 0" class="empty-hint">暂无待执行任务</div>
 
       <div v-else class="task-queue">
-        <div
-          v-for="task in store.已发布任务列表"
-          :key="task.任务ID"
-          class="task-queue-item"
-        >
+        <div v-for="task in store.已发布任务列表" :key="task.任务ID" class="task-queue-item">
           <div class="task-queue-item__info">
             <span class="task-name">{{ task.任务名 }}</span>
             <span class="task-meta">
               执行人: {{ store.获取姓名(task.执行人ID) || '未知' }}
-              <template v-if="task.目标ID">
-                → 目标: {{ store.获取姓名(task.执行人ID) }}
-              </template>
+              <template v-if="task.目标ID"> → 目标: {{ store.获取姓名(task.执行人ID) }} </template>
             </span>
             <span class="task-ap">行动力: {{ task.行动力占用 }}</span>
           </div>
-          <button
-            class="btn btn--small btn--danger"
-            @click="store.取消任务(task.任务ID)"
-          >
-            取消
-          </button>
+          <button class="btn btn--small btn--danger" @click="store.取消任务(task.任务ID)">取消</button>
         </div>
       </div>
     </section>
@@ -359,7 +338,7 @@ function publishTask() {
 .required-mark {
   font-size: 11px;
   color: var(--accent-blood-light);
-  background: rgba(139,38,53,0.2);
+  background: rgba(139, 38, 53, 0.2);
   padding: 1px 4px;
   border-radius: 2px;
 }

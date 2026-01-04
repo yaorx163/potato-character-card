@@ -1,52 +1,58 @@
-<!-- components/entities/ChampionDetail.vue -->
-<!-- 介绍：哥布林冠军的详情页面 -->
+<!-- src/components/entities/ChampionDetail.vue -->
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useGameStore } from '@/stores/gameStore'
+import { useGameStore } from '@/stores/gameStore';
+import { computed } from 'vue';
 
-const store = useGameStore()
-const champion = computed(() => store.选中的冠军)
+const store = useGameStore();
+const champion = computed(() => store.选中的冠军);
 
 const stats = computed(() => {
-  if (!champion.value) return []
+  if (!champion.value) return [];
   return [
     { label: '力量', value: champion.value.获取属性('力量'), color: 'var(--accent-blood)' },
     { label: '敏捷', value: champion.value.获取属性('敏捷'), color: 'var(--accent-poison)' },
     { label: '智力', value: champion.value.获取属性('智力'), color: 'var(--accent-mana)' },
-  ]
-})
+  ];
+});
 
 const minionInfo = computed(() => {
-  if (!champion.value) return null
-  const pool = champion.value.获取喽啰池()
-  if (!pool) return null
+  if (!champion.value) return null;
+  const pool = champion.value.获取喽啰池();
+  if (!pool) return null;
   return {
     current: pool.获取总数量(),
     max: pool.获取最大数量(),
-    power: pool.获取战斗力()
-  }
-})
+    power: pool.获取战斗力(),
+  };
+});
 
 const availableTasks = computed(() => {
-  if (!champion.value) return []
-  const taskManager = store.游戏实例?.获取任务管理器()
-  if (!taskManager) return []
+  const taskManager = store.游戏实例?.获取任务管理器();
+  if (!taskManager) return [];
+  return taskManager
+    .获取所有任务名()
+    .map(name => ({
+      name,
+      config: taskManager.获取任务配置(name),
+    }))
+    .filter(t => {
+      return t.config?.执行人实体类型 === '冠军实体';
+    })
+    .map(t => ({
+      name: t.name,
+      needsTarget: t.config?.目标实体类型 ?? false ? true : false,
+    }));
+});
 
-  const allTasks = taskManager.获取所有任务名()
-  return allTasks.filter(taskName => {
-    const config = taskManager.获取任务配置(taskName)
-    if (!config) return false
-    // 检查是否可以由母畜执行
-    return config.执行人实体类型?.includes('冠军实体')
-  })
-})
+function assignTask(task: { name: string; needsTarget: boolean }) {
+  if (!champion.value) return;
 
-function assignTask(taskName: string) {
-  if (!champion.value) return
-  store.发布任务(taskName, champion.value.实体ID)
+  if (task.needsTarget) {
+    store.开始任务目标选择(task.name, champion.value.实体ID);
+  } else {
+    store.直接发布无目标任务(task.name, champion.value.实体ID);
+  }
 }
-
-
 </script>
 
 <template>
@@ -58,11 +64,7 @@ function assignTask(taskName: string) {
 
     <!-- 属性 -->
     <div class="stat-row">
-      <div
-        v-for="stat in stats"
-        :key="stat.label"
-        class="stat-item"
-      >
+      <div v-for="stat in stats" :key="stat.label" class="stat-item">
         <span class="stat-item__label">{{ stat.label }}</span>
         <span class="stat-item__value" :style="{ color: stat.color }">
           {{ stat.value }}
@@ -87,24 +89,51 @@ function assignTask(taskName: string) {
       <div class="action-group">
         <span class="action-label">分配任务:</span>
         <div class="task-buttons">
-          <button
-            v-for="task in availableTasks"
-            :key="task"
-            class="btn btn--small"
-            @click="assignTask(task)"
-          >
-            {{ task }}
+          <button v-for="task in availableTasks" :key="task.name" class="btn btn--small" @click="assignTask(task)">
+            {{ task.name }}
           </button>
-          <span v-if="availableTasks.length === 0" class="no-task">
-            无可用任务
-          </span>
+          <span v-if="availableTasks.length === 0" class="no-task"> 无可用任务 </span>
         </div>
       </div>
     </div>
   </div>
+
+  <!-- 通用任务目标选择弹层 -->
+  <Teleport to="body">
+    <div v-if="store.任务选择状态.isSelecting" class="target-overlay">
+      <div class="target-modal">
+        <div class="modal-header">
+          <h4>选择任务目标</h4>
+          <span class="modal-task">{{ store.任务选择状态.taskId }}</span>
+        </div>
+        <div class="target-list">
+          <button
+            v-for="target in store.任务选择状态.availableTargets"
+            :key="target.id"
+            class="target-btn"
+            @click="store.选择目标并发布任务(target.id)"
+          >
+            <span class="target-type">[{{ target.type }}]</span>
+            <span class="target-name">{{ target.name }}</span>
+          </button>
+          <div v-if="store.任务选择状态.availableTargets.length === 0" class="no-targets">无可用目标</div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn--small" @click="store.取消任务选择()">取消</button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <style lang="scss" scoped>
+/* 原有样式保持不变，添加通用弹层样式 */
+.champion-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .champion-detail {
   display: flex;
   flex-direction: column;
@@ -164,6 +193,7 @@ function assignTask(taskName: string) {
 
 .detail-actions {
   display: flex;
+  flex-direction: column;
   gap: 6px;
   margin-top: 4px;
 }
@@ -185,8 +215,139 @@ function assignTask(taskName: string) {
   gap: 4px;
 }
 
-.no-task {
+.target-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.target-info {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.no-task,
+.no-target {
   font-size: 15px;
   color: var(--text-dim);
+}
+
+.target-selector {
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 8px;
+  background: var(--bg-secondary);
+}
+
+.btn--selected {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.target-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.btn--confirm {
+  background: var(--accent-success);
+  color: white;
+}
+
+.btn--cancel {
+  background: var(--accent-error);
+  color: white;
+}
+
+/* 通用弹层样式 */
+.target-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  z-index: 1000;
+}
+
+.target-modal {
+  width: 90%;
+  max-width: 400px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-light);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.modal-header {
+  padding: 8px 10px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-dark);
+
+  h4 {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .modal-task {
+    font-size: 11px;
+    color: var(--accent-gold);
+  }
+}
+
+.target-list {
+  padding: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.target-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-dark);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+
+  &:hover {
+    background: var(--bg-hover);
+  }
+}
+
+.target-type {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.target-name {
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.no-targets {
+  font-size: 12px;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 16px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-dark);
 }
 </style>

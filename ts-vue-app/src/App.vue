@@ -1,15 +1,15 @@
 <!-- App.vue -->
 <script setup lang="ts">
-import { onMounted } from 'vue'
-import { useGameStore } from './stores/gameStore'
-import GameController from './components/layout/GameController.vue'
-import NotificationToast from './components/common/NotificationToast.vue'
+import { onMounted } from 'vue';
+import NotificationToast from './components/common/NotificationToast.vue';
+import GameController from './components/layout/GameController.vue';
+import { useGameStore } from './stores/gameStore';
 
-const store = useGameStore()
+const store = useGameStore();
 
 onMounted(() => {
-  store.初始化()
-})
+  store.初始化();
+});
 </script>
 
 <template>
@@ -24,7 +24,7 @@ onMounted(() => {
 </template>
 
 <style lang="scss">
-@import './styles/dark-fantasy.scss';
+@use './styles/dark-fantasy.scss';
 
 .goblin-game-controller {
   width: 100%;
@@ -36,7 +36,7 @@ onMounted(() => {
   border: 1px solid var(--border-dark);
   border-radius: 4px;
   overflow: hidden;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
 .loading-state {
@@ -54,7 +54,12 @@ onMounted(() => {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 </style>
