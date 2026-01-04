@@ -36,7 +36,7 @@ function endTurn() {
       class="btn btn--primary turn-btn"
       @click="endTurn"
     >
-      结束回合 →
+      结束回合
     </button>
   </div>
 </template>

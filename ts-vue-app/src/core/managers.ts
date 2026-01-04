@@ -844,6 +844,20 @@ class 实体管理器 {
       return this.地点表.get(实体ID)!;
     }
 
+    // 检查地点母畜
+    for (const 地点 of this.地点表.values()) {
+      const 已侦查母畜 = 地点.获取已侦查母畜();
+      const 潜在母畜 = 地点.获取潜在母畜();
+      
+      if (已侦查母畜.has(实体ID)) {
+        return 已侦查母畜.get(实体ID)!;
+      }
+      
+      if (潜在母畜.has(实体ID)) {
+        return 潜在母畜.get(实体ID)!;
+      }
+    }
+
     // 检查喽啰池
     if (this.喽啰池表.has(实体ID)) {
       return this.喽啰池表.get(实体ID)!;

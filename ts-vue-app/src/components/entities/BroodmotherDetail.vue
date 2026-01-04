@@ -4,170 +4,163 @@ import { computed } from 'vue';
 import { useGameStore } from '../../stores/gameStore';
 
 const store = useGameStore();
-const broodmother = computed(() => store.选中的母畜);
+const 母畜 = computed(() => store.选中的母畜);
 
 // 基础信息
-const basicInfo = computed(() => {
-  if (!broodmother.value) return [];
+const 基础信息 = computed(() => {
+  if (!母畜.value) return [];
   return [
-    { label: '种族', value: broodmother.value.获取属性('种族') },
-    { label: '原身份', value: broodmother.value.获取属性('原身份') },
-    { label: '年龄', value: broodmother.value.获取属性('年龄') },
+    { 标签: '种族', 值: 母畜.value.获取属性('种族') },
+    { 标签: '原身份', 值: 母畜.value.获取属性('原身份') },
+    { 标签: '年龄', 值: 母畜.value.获取属性('年龄') },
   ];
 });
 
 // 核心属性
-const coreStats = computed(() => {
+const 核心属性 = computed(() => {
   store.检查状态更新();
-  if (!broodmother.value) return [];
-  const 剩余 = broodmother.value.获取属性('剩余生育力');
-  const 总计 = broodmother.value.获取属性('总生育力');
+  if (!母畜.value) return [];
+  const 剩余 = 母畜.value.获取属性('剩余生育力');
+  const 总计 = 母畜.value.获取属性('总生育力');
   return [
     {
-      label: '生育力',
-      current: 剩余,
-      max: 总计,
-      color: 'var(--accent-poison)',
-      percent: 总计 > 0 ? (剩余 / 总计) * 100 : 0,
+      标签: '生育力',
+      当前: 剩余,
+      最大: 总计,
+      颜色: 'var(--accent-poison)',
+      百分比: 总计 > 0 ? (剩余 / 总计) * 100 : 0,
     },
     {
-      label: '臣服度',
-      current: broodmother.value.获取属性('臣服度'),
-      max: 100,
-      color: 'var(--accent-corrupt)',
-      percent: broodmother.value.获取属性('臣服度'),
+      标签: '臣服度',
+      当前: 母畜.value.获取属性('臣服度'),
+      最大: 100,
+      颜色: 'var(--accent-corrupt)',
+      百分比: 母畜.value.获取属性('臣服度'),
     },
   ];
 });
 
 // 身体属性
-const bodyStats = computed(() => {
-  if (!broodmother.value) return [];
+const 身体属性 = computed(() => {
+  if (!母畜.value) return [];
   return [
-    { label: '魅力', value: broodmother.value.获取属性('魅力'), icon: '♥' },
-    { label: '生育', value: broodmother.value.获取属性('总生育力'), icon: '◎' },
-    { label: '臣服', value: broodmother.value.获取属性('臣服度'), icon: '✧' },
-    { label: '淫乱', value: broodmother.value.获取属性('淫乱度'), icon: '✧' },
+    { 标签: '魅力', 值: 母畜.value.获取属性('魅力'), 图标: '♥' },
+    { 标签: '生育', 值: 母畜.value.获取属性('总生育力'), 图标: '◎' },
+    { 标签: '臣服', 值: 母畜.value.获取属性('臣服度'), 图标: '✧' },
+    { 标签: '淫乱', 值: 母畜.value.获取属性('淫乱度'), 图标: '✧' },
   ];
 });
 
 // 状态标签
-const statusTags = computed(() => {
-  if (!broodmother.value) return [];
-  const tags: { label: string; type: string }[] = [];
+const 状态标签列表 = computed(() => {
+  if (!母畜.value) return [];
+  const tags: { 标签: string; 类型: string }[] = [];
 
-  const 臣服度 = broodmother.value.获取属性('臣服度');
+  const 臣服度 = 母畜.value.获取属性('臣服度');
   if (臣服度 >= 80) {
-    tags.push({ label: '完全臣服', type: 'poison' });
+    tags.push({ 标签: '完全臣服', 类型: 'poison' });
   } else if (臣服度 >= 50) {
-    tags.push({ label: '半臣服', type: 'gold' });
+    tags.push({ 标签: '半臣服', 类型: 'gold' });
   } else if (臣服度 >= 20) {
-    tags.push({ label: '抵抗中', type: 'mana' });
+    tags.push({ 标签: '抵抗中', 类型: 'mana' });
   } else {
-    tags.push({ label: '桀骜不驯', type: 'blood' });
+    tags.push({ 标签: '桀骜不驯', 类型: 'blood' });
   }
 
-  // 检查是否忙碌
-  if (broodmother.value && store.检查实体是否有任务(broodmother.value.实体ID)) {
-    tags.push({ label: '执行任务中', type: 'mana' });
+  if (母畜.value && store.检查实体是否有任务(母畜.value.实体ID)) {
+    tags.push({ 标签: '执行任务中', 类型: 'mana' });
   }
 
   return tags;
 });
 
 // 产奶信息
-const milkInfo = computed(() => {
-  if (!broodmother.value) return null;
-  const 产奶量 = broodmother.value.获取属性('每回合产奶量');
-  const 累计 = broodmother.value.获取属性('累计产奶量');
+const 产奶信息 = computed(() => {
+  if (!母畜.value) return null;
+  const 产奶量 = 母畜.value.获取属性('每回合产奶量');
+  const 累计 = 母畜.value.获取属性('累计产奶量');
   if (产奶量 === undefined && 累计 === undefined) return null;
   return {
-    perTurn: 产奶量 ?? 0,
-    total: 累计 ?? 0,
+    每回合: 产奶量 ?? 0,
+    累计: 累计 ?? 0,
   };
 });
 
 // 可用任务
-const availableTasks = computed(() => {
-  if (!broodmother.value) return [];
+const 可用任务列表 = computed(() => {
+  if (!母畜.value) return [];
 
-  const allTasks = store.游戏实例?.任务管理.获取所有任务名();
-  if (!allTasks) return [];
-  return allTasks
-    .filter(taskName => {
-      const config = store.游戏实例?.任务管理.获取任务配置(taskName);
-      if (!config) return false;
-      return config.执行人实体类型?.includes('母畜实体');
+  const 所有任务 = store.游戏实例?.任务管理.获取所有任务名();
+  if (!所有任务) return [];
+
+  return 所有任务
+    .filter(任务名 => {
+      const 配置 = store.游戏实例?.任务管理.获取任务配置(任务名);
+      if (!配置) return false;
+      return 配置.执行人实体类型?.includes('母畜实体');
     })
-    .map(taskName => {
-      const config = store.游戏实例?.任务管理.获取任务配置(taskName);
+    .map(任务名 => {
+      const 配置 = store.游戏实例?.任务管理.获取任务配置(任务名);
       return {
-        name: taskName,
-        needsTarget: config?.目标实体类型 ?? false ? true : false,
-        needsDoubleTarget: config?.目标实体类型?.includes('可袭击地点实体') ? true : false,
+        名称: 任务名,
+        需要目标: !!配置?.目标实体类型,
       };
     });
 });
 
 // 检查是否忙碌
-const isBusy = computed(() => {
-  if (!broodmother.value) return false;
-  return store.检查实体是否有任务(broodmother.value.实体ID);
+const 是否忙碌 = computed(() => {
+  if (!母畜.value) return false;
+  return store.检查实体是否有任务(母畜.value.实体ID);
 });
 
 // 处理任务点击
-function handleTaskClick(taskName: string, task: 
-{name: string, needsTarget: boolean, needsDoubleTarget: boolean}
-) {
-  if (!broodmother.value) return;
-  const needsTarget = task.needsTarget;
-  if (needsTarget) {
-    if (task.needsDoubleTarget) {
-      store.开始任务目标选择(taskName, broodmother.value.实体ID);
-    } else {
-      store.开始任务目标选择(taskName, broodmother.value.实体ID);
-    }
+function 处理任务点击(任务名: string, 需要目标: boolean) {
+  if (!母畜.value) return;
+
+  if (需要目标) {
+    store.开始任务目标选择(任务名, 母畜.value.实体ID);
   } else {
-    store.直接发布无目标任务(taskName, broodmother.value.实体ID);
+    store.直接发布无目标任务(任务名, 母畜.value.实体ID);
   }
 }
 </script>
 
 <template>
-  <div v-if="broodmother" class="broodmother-detail">
+  <div v-if="母畜" class="broodmother-detail">
     <!-- 头部 -->
     <div class="detail-header">
       <h4 class="detail-title">
-        {{ broodmother.获取属性('姓名') }}
+        {{ 母畜.获取属性('姓名') }}
       </h4>
       <div class="status-tags">
-        <span v-for="tag in statusTags" :key="tag.label" class="tag" :class="`tag--${tag.type}`">
-          {{ tag.label }}
+        <span v-for="tag in 状态标签列表" :key="tag.标签" class="tag" :class="`tag--${tag.类型}`">
+          {{ tag.标签 }}
         </span>
       </div>
     </div>
 
     <!-- 基础信息 -->
     <div class="info-grid">
-      <div v-for="info in basicInfo" :key="info.label" class="info-item">
-        <span class="info-label">{{ info.label }}</span>
-        <span class="info-value">{{ info.value }}</span>
+      <div v-for="info in 基础信息" :key="info.标签" class="info-item">
+        <span class="info-label">{{ info.标签 }}</span>
+        <span class="info-value">{{ info.值 }}</span>
       </div>
     </div>
 
     <!-- 核心属性条 -->
     <div class="core-stats">
-      <div v-for="stat in coreStats" :key="stat.label" class="stat-bar-item">
+      <div v-for="stat in 核心属性" :key="stat.标签" class="stat-bar-item">
         <div class="stat-bar-header">
-          <span class="stat-bar-label">{{ stat.label }}</span>
-          <span class="stat-bar-value">{{ stat.current }} / {{ stat.max }}</span>
+          <span class="stat-bar-label">{{ stat.标签 }}</span>
+          <span class="stat-bar-value">{{ stat.当前 }} / {{ stat.最大 }}</span>
         </div>
         <div class="progress-bar">
           <div
             class="progress-bar__fill"
             :style="{
-              width: stat.percent + '%',
-              background: stat.color,
+              width: stat.百分比 + '%',
+              background: stat.颜色,
             }"
           />
         </div>
@@ -176,24 +169,24 @@ function handleTaskClick(taskName: string, task:
 
     <!-- 身体属性 -->
     <div class="body-stats">
-      <div v-for="stat in bodyStats" :key="stat.label" class="body-stat">
-        <span class="body-stat__icon">{{ stat.icon }}</span>
-        <span class="body-stat__label">{{ stat.label }}</span>
-        <span class="body-stat__value">{{ stat.value }}</span>
+      <div v-for="stat in 身体属性" :key="stat.标签" class="body-stat">
+        <span class="body-stat__icon">{{ stat.图标 }}</span>
+        <span class="body-stat__label">{{ stat.标签 }}</span>
+        <span class="body-stat__value">{{ stat.值 }}</span>
       </div>
     </div>
 
     <!-- 产奶信息 -->
-    <div v-if="milkInfo" class="milk-info">
+    <div v-if="产奶信息" class="milk-info">
       <div class="milk-row">
         <span class="milk-icon">✦</span>
         <span>每回合产奶</span>
-        <span class="milk-value">+{{ milkInfo.perTurn }}</span>
+        <span class="milk-value">+{{ 产奶信息.每回合 }}</span>
       </div>
       <div class="milk-row">
         <span class="milk-icon">∑</span>
         <span>累计产出</span>
-        <span class="milk-value">{{ milkInfo.total }}</span>
+        <span class="milk-value">{{ 产奶信息.累计 }}</span>
       </div>
     </div>
 
@@ -203,42 +196,53 @@ function handleTaskClick(taskName: string, task:
         <span class="action-label">分配任务:</span>
         <div class="task-buttons">
           <button
-            v-for="task in availableTasks"
-            :key="task.name"
+            v-for="task in 可用任务列表"
+            :key="task.名称"
             class="btn btn--small"
-            :class="{ 'btn--needs-target': task.needsTarget }"
-            :disabled="isBusy"
-            @click="handleTaskClick(task.name, task)"
+            :class="{ 'btn--needs-target': task.需要目标 }"
+            :disabled="是否忙碌"
+            @click="处理任务点击(task.名称, task.需要目标)"
           >
-            {{ task.name }}
+            {{ task.名称 }}
           </button>
-          <span v-if="availableTasks.length === 0" class="no-task"> 无可用任务 </span>
-          <span v-if="isBusy" class="busy-hint"> (任务执行中) </span>
+          <span v-if="可用任务列表.length === 0" class="no-task">无可用任务</span>
+          <span v-if="是否忙碌" class="busy-hint">(任务执行中)</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- 通用任务目标选择弹层 -->
+  <!-- 目标选择弹层 -->
   <Teleport to="body">
-    <div v-if="store.任务选择状态.isSelecting" class="target-overlay">
+    <div v-if="store.任务选择状态.正在选择" class="target-overlay" @click.self="store.取消任务选择()">
       <div class="target-modal">
         <div class="modal-header">
-          <h4>选择任务目标</h4>
-          <span class="modal-task">{{ store.任务选择状态.taskId }}</span>
+          <h4>{{ store.当前选择层级标题 }}</h4>
+          <span class="modal-task">{{ store.任务选择状态.任务名 }}</span>
         </div>
+
+        <div v-if="store.任务选择状态.是否双层选择 && store.任务选择状态.当前层级 === 1" class="modal-back">
+          <button class="btn btn--small btn--back" @click="store.返回上一层选择()">
+            ← 返回选择地点
+          </button>
+        </div>
+
         <div class="target-list">
           <button
-            v-for="target in store.任务选择状态.availableTargets"
+            v-for="target in store.任务选择状态.可选目标列表"
             :key="target.id"
             class="target-btn"
-            @click="store.选择目标并发布任务(target.id)"
+            @click="store.选择目标(target.id)"
           >
-            <span class="target-type">[{{ target.type }}]</span>
-            <span class="target-name">{{ target.name }}</span>
+            <div class="target-main">
+              <span class="target-type">[{{ target.类型 }}]</span>
+              <span class="target-name">{{ target.名称 }}</span>
+            </div>
+            <span v-if="target.附加信息" class="target-info">{{ target.附加信息 }}</span>
           </button>
-          <div v-if="store.任务选择状态.availableTargets.length === 0" class="no-targets">无可用目标</div>
+          <div v-if="store.任务选择状态.可选目标列表.length === 0" class="no-targets">无可用目标</div>
         </div>
+
         <div class="modal-actions">
           <button class="btn btn--small" @click="store.取消任务选择()">取消</button>
         </div>
@@ -248,14 +252,6 @@ function handleTaskClick(taskName: string, task:
 </template>
 
 <style lang="scss" scoped>
-/* 原有样式保持不变 */
-.broodmother-detail {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  position: relative;
-}
-
 .broodmother-detail {
   display: flex;
   flex-direction: column;
@@ -432,11 +428,6 @@ function handleTaskClick(taskName: string, task:
   border-style: dashed;
 }
 
-.target-indicator {
-  margin-left: 2px;
-  font-size: 10px;
-}
-
 .no-task,
 .busy-hint {
   font-size: 12px;
@@ -445,108 +436,12 @@ function handleTaskClick(taskName: string, task:
 
 /* 目标选择弹层 */
 .target-overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 3px;
-  z-index: 10;
-}
-
-.target-modal {
-  width: 90%;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-light);
-  border-radius: 3px;
-  overflow: hidden;
-}
-
-.modal-header {
-  padding: 8px 10px;
-  background: var(--bg-secondary);
-  border-bottom: 1px solid var(--border-dark);
-
-  h4 {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-primary);
-    margin: 0;
-  }
-
-  .modal-task {
-    font-size: 11px;
-    color: var(--accent-gold);
-  }
-}
-
-.target-list {
-  padding: 8px;
-  max-height: 150px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.target-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-dark);
-  border-radius: 2px;
-  cursor: pointer;
-  transition: all 0.15s;
-  text-align: left;
-
-  &:hover {
-    background: var(--bg-hover);
-  }
-
-  &--selected {
-    border-color: var(--accent-corrupt);
-    background: var(--bg-hover);
-  }
-}
-
-.target-type {
-  font-size: 10px;
-  color: var(--text-dim);
-}
-
-.target-name {
-  font-size: 12px;
-  color: var(--text-primary);
-}
-
-.no-targets {
-  font-size: 12px;
-  color: var(--text-dim);
-  text-align: center;
-  padding: 16px;
-}
-
-.modal-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-  padding: 8px 10px;
-  background: var(--bg-secondary);
-  border-top: 1px solid var(--border-dark);
-}
-
-/* 目标选择弹层样式 */
-.target-overlay {
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.7);
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 3px;
   z-index: 1000;
 }
 
@@ -577,6 +472,21 @@ function handleTaskClick(taskName: string, task:
   }
 }
 
+.modal-back {
+  padding: 6px 10px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-dark);
+}
+
+.btn--back {
+  font-size: 11px;
+  color: var(--text-secondary);
+
+  &:hover {
+    color: var(--text-primary);
+  }
+}
+
 .target-list {
   padding: 8px;
   max-height: 200px;
@@ -588,9 +498,9 @@ function handleTaskClick(taskName: string, task:
 
 .target-btn {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-dark);
   border-radius: 2px;
@@ -600,7 +510,14 @@ function handleTaskClick(taskName: string, task:
 
   &:hover {
     background: var(--bg-hover);
+    border-color: var(--accent-mana);
   }
+}
+
+.target-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .target-type {
@@ -611,6 +528,12 @@ function handleTaskClick(taskName: string, task:
 .target-name {
   font-size: 12px;
   color: var(--text-primary);
+}
+
+.target-info {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-left: 16px;
 }
 
 .no-targets {

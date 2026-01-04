@@ -4,82 +4,88 @@ import { useGameStore } from '@/stores/gameStore';
 import { computed } from 'vue';
 
 const store = useGameStore();
-const champion = computed(() => store.选中的冠军);
+const 冠军 = computed(() => store.选中的冠军);
 
-const stats = computed(() => {
-  if (!champion.value) return [];
+const 属性列表 = computed(() => {
+  if (!冠军.value) return [];
   return [
-    { label: '力量', value: champion.value.获取属性('力量'), color: 'var(--accent-blood)' },
-    { label: '敏捷', value: champion.value.获取属性('敏捷'), color: 'var(--accent-poison)' },
-    { label: '智力', value: champion.value.获取属性('智力'), color: 'var(--accent-mana)' },
+    { 标签: '力量', 值: 冠军.value.获取属性('力量'), 颜色: 'var(--accent-blood)' },
+    { 标签: '敏捷', 值: 冠军.value.获取属性('敏捷'), 颜色: 'var(--accent-poison)' },
+    { 标签: '智力', 值: 冠军.value.获取属性('智力'), 颜色: 'var(--accent-mana)' },
   ];
 });
 
-const minionInfo = computed(() => {
-  if (!champion.value) return null;
-  const pool = champion.value.获取喽啰池();
+const 喽啰信息 = computed(() => {
+  if (!冠军.value) return null;
+  const pool = 冠军.value.获取喽啰池();
   if (!pool) return null;
   return {
-    current: pool.获取总数量(),
-    max: pool.获取最大数量(),
-    power: pool.获取战斗力(),
+    当前: pool.获取总数量(),
+    最大: pool.获取最大数量(),
+    战斗力: pool.获取战斗力(),
   };
 });
 
-const availableTasks = computed(() => {
+// 可用任务列表
+const 可用任务列表 = computed(() => {
   if (!store.游戏实例) return [];
-  const allTasks = store.游戏实例?.任务管理.获取所有任务名();
-  return allTasks
+  const 所有任务 = store.游戏实例?.任务管理.获取所有任务名();
+  return 所有任务
     .map(name => ({
-      name,
-      config: store.游戏实例?.任务管理.获取任务配置(name),
+      名称: name,
+      配置: store.游戏实例?.任务管理.获取任务配置(name),
     }))
-    .filter(t => {
-      return t.config?.执行人实体类型 === '冠军实体';
-    })
+    .filter(t => t.配置?.执行人实体类型 === '冠军实体')
     .map(t => ({
-      name: t.name,
-      needsTarget: t.config?.目标实体类型 ? true : false,
+      名称: t.名称,
+      需要目标: !!t.配置?.目标实体类型,
     }));
 });
 
-function assignTask(task: { name: string; needsTarget: boolean }) {
-  if (!champion.value) return;
+// 是否忙碌
+const 是否忙碌 = computed(() => {
+  if (!冠军.value) return false;
+  return store.检查实体是否有任务(冠军.value.实体ID);
+});
 
-  if (task.needsTarget) {
-    store.开始任务目标选择(task.name, champion.value.实体ID);
+function 分配任务(任务名: string, 需要目标: boolean) {
+  if (!冠军.value) return;
+
+  if (需要目标) {
+    store.开始任务目标选择(任务名, 冠军.value.实体ID);
   } else {
-    store.直接发布无目标任务(task.name, champion.value.实体ID);
+    store.直接发布无目标任务(任务名, 冠军.value.实体ID);
   }
 }
 </script>
 
 <template>
-  <div v-if="champion" class="champion-detail">
+  <div v-if="冠军" class="champion-detail">
     <h4 class="detail-title">
-      {{ champion.获取属性('姓名') }}
+      {{ 冠军.获取属性('姓名') }}
       <span class="tag tag--blood">冠军</span>
+      <span v-if="是否忙碌" class="tag tag--mana">执行任务中</span>
     </h4>
 
     <!-- 属性 -->
     <div class="stat-row">
-      <div v-for="stat in stats" :key="stat.label" class="stat-item">
-        <span class="stat-item__label">{{ stat.label }}</span>
-        <span class="stat-item__value" :style="{ color: stat.color }">
-          {{ stat.value }}
+      <div v-for="stat in 属性列表" :key="stat.标签" class="stat-item">
+        <span class="stat-item__label">{{ stat.标签 }}</span>
+        <span class="stat-item__value" :style="{ color: stat.颜色 }">
+          {{ stat.值 }}
         </span>
       </div>
     </div>
 
     <!-- 喽啰池 -->
-    <div v-if="minionInfo" class="minion-info">
+    <div v-if="喽啰信息" class="minion-info">
       <div class="info-row">
         <span>喽啰</span>
-        <span>{{ minionInfo.current }} / {{ minionInfo.max }}</span>
+        <span>{{ 喽啰信息.当前 }} / {{ 喽啰信息.最大 }}</span>
       </div>
       <div class="info-row">
         <span>战斗力</span>
-        <span class="text-accent">{{ Math.round(minionInfo.power) }}</span>
+        <span class="text-accent">{{ Math.round(喽啰信息.战斗力) }}</span>
       </div>
     </div>
 
@@ -88,35 +94,54 @@ function assignTask(task: { name: string; needsTarget: boolean }) {
       <div class="action-group">
         <span class="action-label">分配任务:</span>
         <div class="task-buttons">
-          <button v-for="task in availableTasks" :key="task.name" class="btn btn--small" @click="assignTask(task)">
-            {{ task.name }}
+          <button
+            v-for="task in 可用任务列表"
+            :key="task.名称"
+            class="btn btn--small"
+            :class="{ 'btn--needs-target': task.需要目标 }"
+            :disabled="是否忙碌"
+            @click="分配任务(task.名称, task.需要目标)"
+          >
+            {{ task.名称 }}
           </button>
-          <span v-if="availableTasks.length === 0" class="no-task"> 无可用任务 </span>
+          <span v-if="可用任务列表.length === 0" class="no-task">无可用任务</span>
+          <span v-if="是否忙碌" class="busy-hint">(任务执行中)</span>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- 通用任务目标选择弹层 -->
+  <!-- 目标选择弹层 -->
   <Teleport to="body">
-    <div v-if="store.任务选择状态.isSelecting" class="target-overlay">
+    <div v-if="store.任务选择状态.正在选择" class="target-overlay" @click.self="store.取消任务选择()">
       <div class="target-modal">
         <div class="modal-header">
-          <h4>选择任务目标</h4>
-          <span class="modal-task">{{ store.任务选择状态.taskId }}</span>
+          <h4>{{ store.当前选择层级标题 }}</h4>
+          <span class="modal-task">{{ store.任务选择状态.任务名 }}</span>
         </div>
+
+        <div v-if="store.任务选择状态.是否双层选择 && store.任务选择状态.当前层级 === 1" class="modal-back">
+          <button class="btn btn--small btn--back" @click="store.返回上一层选择()">
+            ← 返回选择地点
+          </button>
+        </div>
+
         <div class="target-list">
           <button
-            v-for="target in store.任务选择状态.availableTargets"
+            v-for="target in store.任务选择状态.可选目标列表"
             :key="target.id"
             class="target-btn"
-            @click="store.选择目标并发布任务(target.id)"
+            @click="store.选择目标(target.id)"
           >
-            <span class="target-type">[{{ target.type }}]</span>
-            <span class="target-name">{{ target.name }}</span>
+            <div class="target-main">
+              <span class="target-type">[{{ target.类型 }}]</span>
+              <span class="target-name">{{ target.名称 }}</span>
+            </div>
+            <span v-if="target.附加信息" class="target-info">{{ target.附加信息 }}</span>
           </button>
-          <div v-if="store.任务选择状态.availableTargets.length === 0" class="no-targets">无可用目标</div>
+          <div v-if="store.任务选择状态.可选目标列表.length === 0" class="no-targets">无可用目标</div>
         </div>
+
         <div class="modal-actions">
           <button class="btn btn--small" @click="store.取消任务选择()">取消</button>
         </div>
@@ -126,7 +151,6 @@ function assignTask(task: { name: string; needsTarget: boolean }) {
 </template>
 
 <style lang="scss" scoped>
-/* 原有样式保持不变，添加通用弹层样式 */
 .champion-detail {
   display: flex;
   flex-direction: column;
@@ -206,9 +230,20 @@ function assignTask(task: { name: string; needsTarget: boolean }) {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  align-items: center;
 }
 
-/* 通用弹层样式 */
+.btn--needs-target {
+  border-style: dashed;
+}
+
+.no-task,
+.busy-hint {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* 目标选择弹层 */
 .target-overlay {
   position: fixed;
   inset: 0;
@@ -216,7 +251,6 @@ function assignTask(task: { name: string; needsTarget: boolean }) {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 3px;
   z-index: 1000;
 }
 
@@ -247,6 +281,21 @@ function assignTask(task: { name: string; needsTarget: boolean }) {
   }
 }
 
+.modal-back {
+  padding: 6px 10px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-dark);
+}
+
+.btn--back {
+  font-size: 11px;
+  color: var(--text-secondary);
+
+  &:hover {
+    color: var(--text-primary);
+  }
+}
+
 .target-list {
   padding: 8px;
   max-height: 200px;
@@ -258,9 +307,9 @@ function assignTask(task: { name: string; needsTarget: boolean }) {
 
 .target-btn {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 8px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px;
   background: var(--bg-secondary);
   border: 1px solid var(--border-dark);
   border-radius: 2px;
@@ -270,7 +319,14 @@ function assignTask(task: { name: string; needsTarget: boolean }) {
 
   &:hover {
     background: var(--bg-hover);
+    border-color: var(--accent-mana);
   }
+}
+
+.target-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .target-type {
@@ -281,6 +337,12 @@ function assignTask(task: { name: string; needsTarget: boolean }) {
 .target-name {
   font-size: 12px;
   color: var(--text-primary);
+}
+
+.target-info {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-left: 16px;
 }
 
 .no-targets {

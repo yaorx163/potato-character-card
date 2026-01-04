@@ -483,6 +483,8 @@ class 存档管理器 {
             const 存档JSON = JSON.stringify(存档数据);
             const 存档键 = this.获取存档键(槽位);
 
+            console.log('保存游戏数据:', 存档JSON);
+
             localStorage.setItem(存档键, 存档JSON);
 
             return { 成功: true };

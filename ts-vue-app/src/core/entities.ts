@@ -569,6 +569,10 @@ class 可袭击地点实体 extends 实体基类<可袭击地点属性Schema> {
 
   // ===== 母畜查询 =====
 
+  获取已侦查母畜(): Map<string, 母畜实体> {
+    return this.已侦察母畜;
+  }
+
   获取所有已侦察母畜(): 母畜实体[] {
     return [...this.已侦察母畜.values()];
   }
