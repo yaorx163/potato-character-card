@@ -1,0 +1,7063 @@
+============================================================
+目录结构: D:\testcode\st\potato-character-card\ts-vue-app\src
+============================================================
+
+./
+  App.vue
+  main.ts
+  style.css
+  components/
+    common/
+      NotificationToast.vue
+    entities/
+      BroodmotherDetail.vue
+      ChampionDetail.vue
+      EntityDetail.vue
+      EntityList.vue
+      LocationDetail.vue
+    layout/
+      GameController.vue
+      StatusBar.vue
+      TabNav.vue
+      TurnControl.vue
+    modals/
+      TurnSummaryModal.vue
+    panels/
+      CombatPanel.vue
+      DashboardPanel.vue
+      EntitiesPanel.vue
+      MarketPanel.vue
+      MinionPanel.vue
+      SpellPanel.vue
+      TasksPanel.vue
+    sidebar/
+  core/
+    combat.ts
+    entities.ts
+    factories.ts
+    managers.ts
+    persistence.ts
+  data/
+    config.ts
+    rules.ts
+    trait.ts
+  game/
+    bootstrap.ts
+    controller.ts
+  stores/
+    gameStore.ts
+  styles/
+    dark-fantasy.scss
+  types/
+    combat.ts
+    common.ts
+    controller.ts
+    entities.ts
+    factories.ts
+    index.ts
+    managers.ts
+    persistence.ts
+    systems.ts
+
+============================================================
+
+// ═══════════════════════════════════════════════════════════════
+// main.ts
+// ═══════════════════════════════════════════════════════════════
+import { createApp } from 'vue';
+import { createPinia } from 'pinia';
+import App from './App.vue';
+
+// 导入全局样式
+import './styles/dark-fantasy.scss';
+
+const app = createApp(App);
+const pinia = createPinia();
+
+app.use(pinia);
+app.mount('#app');
+
+// ═══════════════════════════════════════════════════════════════
+// core/combat.ts
+// 战斗系统 - 喽啰调配与战斗调度
+// ═══════════════════════════════════════════════════════════════
+
+import { 冠军实体, 喽啰池实体, 可袭击地点实体 } from './entities';
+import { 任务管理器 } from './managers';
+
+// ═══════════════════════════════════════════════════════════════
+// 类型定义
+// ═══════════════════════════════════════════════════════════════
+
+
+
+
+
+
+
+// ═══════════════════════════════════════════════════════════════
+// 导出
+// ═══════════════════════════════════════════════════════════════
+
+
+
+// ═══════════════════════════════════════════════════════════════
+// core/entities.ts
+// 实体基类与所有实体类型定义
+// ═══════════════════════════════════════════════════════════════
+
+import type {武装等级, 属性约束配置, 元数据配置, 实体初始数据, 实体基类属性Schema, 领主属性Schema, 冠军属性Schema, 
+  母畜属性Schema, 武装分组数据, 武装等级配置, 喽啰池初始数据, 减少喽啰结果, 武装升级结果, 分组详情, 分配喽啰结果, 可袭击地点配置,
+   可袭击地点属性Schema, 事件处理器, 冠军初始数据, 领主初始数据, 魔力操作结果, 魔力获得结果, 母畜初始数据, 消耗结果} from '../types/index';
+
+// ═══════════════════════════════════════════════════════════════
+// 实体基类
+// ═══════════════════════════════════════════════════════════════
+class 实体基类<TSchema extends 实体基类属性Schema = 实体基类属性Schema> {
+  static 实体计数器: number = 0;
+
+  readonly 实体ID: string;
+  readonly 实体类型: string;
+  protected 属性容器: Map<string, unknown>;
+  protected 元数据: 元数据配置;
+  protected 事件监听器: Map<string, 事件处理器[]>;
+  protected 属性约束: Map<string, 属性约束配置>;
+
+  constructor(实体类型: string, 初始数据: 实体初始数据 = {}) {
+    this.实体类型 = 实体类型;
+    this.实体ID = 初始数据.实体ID ?? this.生成唯一ID();
+    this.属性容器 = new Map();
+    this.元数据 = {
+      创建时间: Date.now(),
+      ...初始数据.元数据,
+    };
+    this.事件监听器 = new Map();
+    this.属性约束 = 初始数据.属性约束 ?? new Map();
+  }
+
+  private 生成唯一ID(): string {
+    实体基类.实体计数器++;
+    return `${this.实体类型}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}_${实体基类.实体计数器.toString(
+      36,
+    )}`;
+  }
+
+  // ─── 类型安全的属性操作 ───
+
+  /**
+   * 设置属性 - 属性名和值类型自动关联
+   */
+  设置属性<K extends keyof TSchema & string>(属性名: K, 值: TSchema[K]): void {
+    const 旧值 = this.属性容器.get(属性名);
+    let 处理后的值: TSchema[K] = 值;
+
+    // 数值约束处理
+    const 约束 = this.属性约束.get(属性名);
+    if (约束 && typeof 值 === 'number') {
+      处理后的值 = Math.max(约束.最小值, Math.min(约束.最大值, 值)) as TSchema[K];
+    }
+
+    this.属性容器.set(属性名, 处理后的值);
+    this.触发事件('属性变更', { 属性名, 旧值, 新值: 处理后的值 });
+  }
+
+  /**
+   * 获取属性 - 返回类型自动推断
+   */
+  获取属性<K extends keyof TSchema & string>(属性名: K): TSchema[K];
+  获取属性<K extends keyof TSchema & string>(属性名: K, 默认值: TSchema[K]): TSchema[K];
+  获取属性<K extends keyof TSchema & string>(属性名: K, 默认值?: TSchema[K]): TSchema[K] | undefined {
+    if (this.属性容器.has(属性名)) {
+      return this.属性容器.get(属性名) as TSchema[K];
+    }
+    return 默认值;
+  }
+
+  /**
+   * 修改数值属性 - 仅适用于 number 类型
+   */
+  修改属性<K extends keyof TSchema & string>(属性名: TSchema[K] extends number ? K : never, 增量: number): number {
+    const 当前值 = (this.获取属性(属性名 as K) ?? 0) as number;
+    let 新值 = 当前值 + 增量;
+
+    const 约束 = this.属性约束.get(属性名);
+    if (约束) {
+      新值 = Math.max(约束.最小值, Math.min(约束.最大值, 新值));
+    }
+
+    this.设置属性(属性名 as K, 新值 as TSchema[K]);
+    return 新值;
+  }
+
+  /**
+   * 批量设置属性 - 部分更新
+   */
+  批量设置属性(属性对象: Partial<TSchema>): void {
+    (Object.entries(属性对象) as [keyof TSchema & string, unknown][]).forEach(([属性名, 值]) => {
+      this.设置属性(属性名, 值 as TSchema[typeof 属性名]);
+    });
+  }
+
+  /**
+   * 获取所有属性快照
+   */
+  获取所有属性(): Partial<TSchema> {
+    return Object.fromEntries(this.属性容器) as Partial<TSchema>;
+  }
+
+  // ─── 约束设置（仅限数值属性）───
+
+  设置属性约束<K extends keyof TSchema & string>(
+    属性名: TSchema[K] extends number ? K : never,
+    最小值: number,
+    最大值: number,
+  ): void {
+    this.属性约束.set(属性名, { 最小值, 最大值 });
+  }
+
+  // ─── 事件系统 ───
+  监听事件<T = unknown>(事件名: string, 处理器: 事件处理器<T>): () => void {
+    if (!this.事件监听器.has(事件名)) {
+      this.事件监听器.set(事件名, []);
+    }
+    this.事件监听器.get(事件名)!.push(处理器 as 事件处理器);
+    return () => {
+      const 列表 = this.事件监听器.get(事件名);
+      const 索引 = 列表?.indexOf(处理器 as 事件处理器);
+      if (索引 !== undefined && 索引 !== -1) {
+        列表!.splice(索引, 1);
+      }
+    };
+  }
+
+  触发事件(事件名: string, 数据: unknown = {}): void {
+    const 处理器列表 = this.事件监听器.get(事件名) ?? [];
+    处理器列表.forEach(处理器 => {
+      try {
+        处理器(数据, this);
+      } catch (错误) {
+        console.error(`实体事件处理错误 [${事件名}]:`, 错误);
+      }
+    });
+  }
+
+  销毁(): void {
+    this.触发事件('实体销毁');
+    this.事件监听器.clear();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 领主实体
+// ═══════════════════════════════════════════════════════════════
+
+class 领主实体 extends 实体基类<领主属性Schema> {
+  constructor(初始数据: 领主初始数据 = {}) {
+    super('领主', 初始数据);
+
+    this.设置属性约束('魔力', 0, Infinity);
+    this.设置属性约束('最大魔力', 0, Infinity);
+
+    this.设置属性('魔力', 初始数据.魔力 ?? 0);
+    this.设置属性('最大魔力', 初始数据.最大魔力 ?? 100);
+    this.设置属性('姓名', 初始数据.姓名 ?? '无名领主');
+  }
+
+  消耗魔力(数量: number): 魔力操作结果 {
+    const 当前魔力 = this.获取属性('魔力');
+    if (当前魔力 < 数量) {
+      return { 成功: false, 原因: '魔力不足', 当前: 当前魔力, 需要: 数量 };
+    }
+    this.设置属性('魔力', 当前魔力 - 数量);
+    return { 成功: true, 剩余: 当前魔力 - 数量 };
+  }
+
+  获得魔力(数量: number): 魔力获得结果 {
+    const 当前魔力 = this.获取属性('魔力');
+    const 最大魔力 = this.获取属性('最大魔力');
+    const 新魔力 = Math.min(当前魔力 + 数量, 最大魔力);
+    const 实际获得 = 新魔力 - 当前魔力;
+
+    this.设置属性('魔力', 新魔力);
+
+    return { 实际获得, 当前: 新魔力, 溢出: 数量 - 实际获得 };
+  }
+
+  获取魔力百分比(): number {
+    const 当前 = this.获取属性('魔力');
+    const 最大 = this.获取属性('最大魔力');
+    return 最大 > 0 ? (当前 / 最大) * 100 : 0;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 冠军实体
+// ═══════════════════════════════════════════════════════════════
+
+class 冠军实体 extends 实体基类<冠军属性Schema> {
+  管理喽啰池: 喽啰池实体 | null;
+  生母: string | null;
+
+  constructor(初始数据: 冠军初始数据 = {}) {
+    super('冠军', 初始数据);
+
+    this.设置属性约束('力量', 0, 100);
+    this.设置属性约束('敏捷', 0, 100);
+    this.设置属性约束('智力', 0, 100);
+
+    this.设置属性('姓名', 初始数据.姓名 ?? '无名冠军');
+    this.设置属性('性别', 初始数据.性别 ?? '男');
+    this.设置属性('力量', 初始数据.力量 ?? 10);
+    this.设置属性('敏捷', 初始数据.敏捷 ?? 10);
+    this.设置属性('智力', 初始数据.智力 ?? 10);
+
+    this.设置属性('来源', 初始数据.来源 ?? '');
+    this.生母 = 初始数据.生母 ?? null; 
+
+    this.管理喽啰池 = 初始数据.管理喽啰池 ?? new 喽啰池实体({ 将领: this });
+
+  }
+
+  获取喽啰池(): 喽啰池实体 {
+    if (!this.管理喽啰池) {
+      this.管理喽啰池 = new 喽啰池实体({ 将领: this });
+    }
+    return this.管理喽啰池;
+  }
+
+  计算可统帅喽啰数(): number {
+    return this.获取属性('力量');
+  }
+
+  计算总属性值(): number {
+    return this.获取属性('力量') + this.获取属性('敏捷') + this.获取属性('智力');
+  }
+
+  获取效率(属性:'力量' | '敏捷' | '智力'): number  {
+    switch (属性) {
+      case '力量':
+        const 力量 = this.获取属性('力量');
+        return 力量 * 力量 / 4000;
+      case '敏捷':
+        const 敏捷 = this.获取属性('敏捷');
+        return 敏捷 * 敏捷 / 4000;
+      case '智力':
+        const 智力 = this.获取属性('智力');
+        return 智力 * 智力 / 4000;
+    }
+  }
+
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 母畜实体
+// ═══════════════════════════════════════════════════════════════
+
+class 母畜实体 extends 实体基类<母畜属性Schema> {
+  特性列表: Set<string>;
+  来源地点ID: string | null;
+  冠军生育记录: string[];
+  喽啰生育记录: number;
+
+  constructor(配置: 母畜初始数据 = {}) {
+    super('母畜', 配置);
+
+    this.设置属性约束('臣服度', 0, 100);
+    this.设置属性约束('淫乱度', 0, 100);
+    this.设置属性约束('魅力', 0, 100);
+    this.设置属性约束('总生育力', 0, Infinity);
+    this.设置属性约束('剩余生育力', 0, Infinity);
+
+    this.设置属性('姓名', 配置.姓名 ?? '无名');
+    this.设置属性('种族', 配置.种族 ?? '人类');
+    this.设置属性('年龄', 配置.年龄 ?? 20);
+    this.设置属性('原身份', 配置.原身份 ?? '平民');
+    this.设置属性('来源', 配置.来源 ?? '未知');
+    this.设置属性('描述', 配置.描述 ?? '');
+
+    const 总值 = 配置.总生育力 ?? 100;
+    this.设置属性('魅力', 配置.魅力 ?? 10);
+    this.设置属性('总生育力', 总值);
+    this.设置属性('剩余生育力', 配置.剩余生育力 ?? 总值);
+    this.设置属性('淫乱度', 配置.淫乱度 ?? 0);
+    this.设置属性('臣服度', 配置.臣服度 ?? 0);
+
+    this.特性列表 = new Set(配置.特性列表 || []);
+    this.来源地点ID = 配置.来源地点ID || null;
+    this.冠军生育记录 = 配置.冠军生育记录 || [];
+    this.喽啰生育记录 = 配置.喽啰生育记录 || 0;
+  }
+
+  // 重写设置属性以处理特殊联动逻辑
+  设置属性<K extends keyof 母畜属性Schema & string>(属性名: K, 值: 母畜属性Schema[K]): void {
+    switch (属性名) {
+      case '总生育力':
+        if (typeof 值 === 'number'){
+          this.属性约束.set('剩余生育力', { 最小值: 0, 最大值: 值 });
+          const 当前剩余 = this.属性容器.get('剩余生育力') as number | undefined;
+          if (当前剩余 !== undefined && 当前剩余 > 值) {
+            this.属性容器.set('剩余生育力', 值);
+          }
+      }
+      break;
+      case '魅力':
+
+      break;
+    }
+    super.设置属性(属性名, 值);
+  }
+  修改属性<K extends keyof 母畜属性Schema & string>(属性名: 母畜属性Schema[K] extends number ? K : never, 增量: number): number {
+    switch (属性名) {
+      case '总生育力':
+
+      break;
+      case '魅力':
+
+      break;
+    }
+    return super.修改属性(属性名, 增量);
+  }
+
+
+  获取效率(属性:'魅力' | '淫乱度' | '臣服度' | '淫乱度惩罚'): number  {
+    const 淫乱度 = this.获取属性('淫乱度');
+    switch (属性) {
+      case '魅力':
+        const 魅力 = this.获取属性('魅力');
+        return 魅力 * 魅力 / 4000;
+      case '淫乱度':
+        return 淫乱度 * 淫乱度 / 4000;
+      case '臣服度':
+        const 臣服度 = this.获取属性('臣服度');
+        return 臣服度 * 臣服度 / 4000;
+      case '淫乱度惩罚':
+        return Math.max((125 - 淫乱度) / 100, 0);
+    }
+  }
+  生育冠军消耗(): number{
+    return 100
+  }
+  生育喽啰消耗(): number{
+    return 10
+  }
+  消耗生育力(生育对象: 冠军实体 | number): void {
+    if (生育对象){
+      this.修改属性('剩余生育力', - this.生育冠军消耗());
+    }else {
+      this.修改属性('剩余生育力', - this.生育喽啰消耗());
+    }
+  }
+
+  添加特性(特性名: string): void {
+    this.特性列表.add(特性名);
+  }
+
+  移除特性(特性名: string): void {
+    this.特性列表.delete(特性名);
+  }
+
+  拥有特性(特性名: string): boolean {
+    return this.特性列表.has(特性名);
+  }
+
+  记录生育冠军(冠军: 冠军实体): void {
+    this.冠军生育记录.push(冠军.实体ID);
+  }
+
+  记录生育喽啰(实际产出: number): void {
+    if (实际产出 <= 0) return;
+    this.喽啰生育记录 += 实际产出;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 喽啰池
+// ═══════════════════════════════════════════════════════════════
+
+class 喽啰池实体 extends 实体基类 {
+  武装分组: Map<武装等级, 武装分组数据>;
+  将领: 冠军实体 | null;
+  constructor(初始数据: 喽啰池初始数据 = {
+    将领: null,
+  }) {
+    super('喽啰池', 初始数据);
+    this.武装分组 = new Map([
+      ['未武装', {
+          数量: 0,
+          战斗力: 100,
+          描述: '未经武装的喽啰',
+      }],
+      ['低级武装', {
+          数量: 0,
+          战斗力: 110,
+          描述: '初级武装的喽啰',
+      }],
+      ['中级武装', {
+          数量: 0,
+          战斗力: 120,
+          描述: '中级武装的喽啰',
+      }],
+      ['高级武装', {
+          数量: 0,
+          战斗力: 160,
+          描述: '高级武装的喽啰',
+      }],
+      ['精英武装', {
+          数量: 0,
+          战斗力: 300,
+          描述: '精英武装的喽啰',
+      }],
+  ])
+    this.将领 = 初始数据.将领 ?? null;
+  }
+
+  // ─── 数量操作 ───
+  设置将领(将领: 冠军实体): void {
+    this.将领 = 将领;
+  }
+
+  增加喽啰(数量: number, 武装等级: 武装等级 = '未武装'): void {
+    const 分组 = this.武装分组.get(武装等级);
+    if (!分组) {
+      console.warn(`未知武装等级: ${武装等级}，添加到未武装`);
+      this.武装分组.get('未武装')!.数量 += 数量;
+      return;
+    }
+    分组.数量 += 数量;
+  }
+
+  减少喽啰(数量: number, 武装等级: 武装等级 = '未武装'): 减少喽啰结果 {
+    const 分组 = this.武装分组.get(武装等级);
+    if (!分组) return { 成功: false, 原因: '未知武装等级' };
+
+    const 实际减少 = Math.min(数量, 分组.数量);
+    分组.数量 -= 实际减少;
+
+    this.武装分组.set(武装等级, 分组);
+    console.log(this);
+
+    return {
+      成功: true,
+      实际减少,
+      剩余: 分组.数量,
+    };
+  }
+
+  获取分组数量(武装等级: 武装等级): number {
+    return this.武装分组.get(武装等级)?.数量 ?? 0;
+  }
+
+  // ─── 统计 ───
+
+  获取最大数量(): number {
+    if (this.将领) {
+      return this.将领.计算可统帅喽啰数();
+    }
+    return Infinity;
+  }
+
+  获取总数量(): number {
+    let 总数 = 0;
+    this.武装分组.forEach(分组 => {
+      总数 += 分组.数量;
+    });
+    return 总数;
+  }
+
+  获取分组详情(): 分组详情[] {
+    return Array.from(this.武装分组.entries()).map(([等级, 数据]) => ({
+      等级,
+      ...数据,
+    }));
+  }
+
+  private 计算总战斗力(): number {
+    let 总战力 = 0;
+    this.武装分组.forEach(分组 => {
+      总战力 += 分组.数量 * (分组.战斗力 / 100);
+    });
+    return 总战力;
+  }
+
+  获取战斗力(): number {
+    if (this.将领) {
+      const 敏捷 = this.将领.获取属性('敏捷');
+      const 智力 = this.将领.获取属性('智力');
+      const 部曲战斗力 = this.计算总战斗力();
+      const 加权战斗力 = (部曲战斗力 * (智力 + 150)) / 150 + 敏捷 * 10;
+      return 加权战斗力;
+    }
+    return 0;
+  }
+
+  获取将领(): 冠军实体 | null {
+    return this.将领;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 可袭击地点实体
+// ═══════════════════════════════════════════════════════════════
+
+class 可袭击地点实体 extends 实体基类<可袭击地点属性Schema> {
+  地点名称: string;
+  地点类型: string;
+  描述: string;
+  侦察最大值: number;
+  侦察进度: number;
+  潜在地点母畜池: Map<string, 母畜实体>;
+  已侦察母畜: Map<string, 母畜实体>;
+  战斗力估值: number | null;
+
+  constructor(配置: 可袭击地点配置 = {}) {
+    super('可袭击地点', 配置);
+
+    this.地点名称 = 配置.地点名称 || '未知地点';
+    this.地点类型 = 配置.地点类型 || '村庄';
+    this.描述 = 配置.描述 || '';
+    this.侦察最大值 = 配置.侦察最大值 ?? 100;
+    this.侦察进度 = 配置.侦察进度 ?? 0;
+
+    this.设置属性('战斗力', 配置.战斗力 ?? 100);
+    this.战斗力估值 = null;
+
+    this.潜在地点母畜池 = new Map();
+    this.已侦察母畜 = new Map();
+  }
+
+  // ===== 潜在母畜管理 =====
+
+  添加潜在母畜(母畜实体: 母畜实体): void {
+    母畜实体.设置属性('来源', this.地点名称);
+    this.潜在地点母畜池.set(母畜实体.实体ID, 母畜实体);
+  }
+
+  获取随机潜在母畜(): 母畜实体 | null {
+    const 母畜列表 = [...this.潜在地点母畜池.values()];
+    if (母畜列表.length === 0) return null;
+
+    return 母畜列表[Math.floor(Math.random() * 母畜列表.length)] ?? null;
+  }
+
+  标记母畜已侦察(母畜输入: 母畜实体 | string): 母畜实体 | null {
+    const 母畜实体ID = typeof 母畜输入 === 'string' ? 母畜输入 : 母畜输入.实体ID;
+    const 目标母畜 = this.潜在地点母畜池.get(母畜实体ID);
+    if (!目标母畜) return null;
+
+    this.潜在地点母畜池.delete(母畜实体ID);
+    this.已侦察母畜.set(母畜实体ID, 目标母畜);
+    return 目标母畜;
+  }
+
+  移除已捕获母畜(母畜输入: 母畜实体 | string): boolean {
+    const 母畜实体ID = typeof 母畜输入 === 'string' ? 母畜输入 : 母畜输入.实体ID;
+    return this.已侦察母畜.delete(母畜实体ID);
+  }
+
+  增加侦察进度(增量: number): number {
+    this.侦察进度 = Math.min(this.侦察进度 + 增量, this.侦察最大值);
+    const 真实战斗力 = this.获取属性('战斗力');
+    this.战斗力估值 = 真实战斗力 * Math.pow(Math.E, (Math.random() * 2 - 1) * (1 - this.侦察进度 / this.侦察最大值))
+    return this.侦察进度;
+  }
+
+  是否侦察完成(): boolean {
+    return this.侦察进度 >= this.侦察最大值;
+  }
+
+  是否存在未侦察母畜(): boolean {
+    return this.潜在地点母畜池.size > 0;
+  }
+
+
+  // ===== 母畜查询 =====
+
+  获取已侦查母畜(): Map<string, 母畜实体> {
+    return this.已侦察母畜;
+  }
+
+  获取所有已侦察母畜(): 母畜实体[] {
+    return [...this.已侦察母畜.values()];
+  }
+
+  获取母畜(母畜实体ID: string): 母畜实体 | undefined {
+    return this.已侦察母畜.get(母畜实体ID) || this.潜在地点母畜池.get(母畜实体ID);
+  }
+
+  获取潜在母畜数量(): number {
+    return this.潜在地点母畜池.size;
+  }
+
+  获取潜在母畜列表(): 母畜实体[] {
+    return [...this.潜在地点母畜池.values()];
+  }
+
+  获取潜在母畜(): Map<string, 母畜实体> {
+    return this.潜在地点母畜池;
+  }
+
+  获取已侦察母畜数量(): number {
+    return this.已侦察母畜.size;
+  }
+
+  获取侦察进度(): number {
+    return this.侦察进度;
+  }
+
+  获取侦查最大值(): number {
+    return Math.max(this.侦察最大值, 1);
+  }
+
+  获取战斗力估值(): number | null {
+    return this.战斗力估值;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 导出
+// ═══════════════════════════════════════════════════════════════
+
+export { 冠军实体, 可袭击地点实体, 喽啰池实体, 实体基类, 母畜实体, 领主实体 };
+
+export type {
+  事件处理器,
+  元数据配置,
+  冠军初始数据,
+  减少喽啰结果,
+  分组详情,
+  分配喽啰结果,
+  可袭击地点配置,
+  喽啰池初始数据,
+  实体初始数据,
+  属性约束配置,
+  武装分组数据,
+  武装升级结果,
+  武装等级配置,
+  母畜初始数据,
+  消耗结果,
+  领主初始数据,
+  魔力操作结果,
+  魔力获得结果,
+};
+
+// ═══════════════════════════════════════════════════════════════
+// core/factories.ts
+// 工厂类 - 负责创建游戏实体
+// ═══════════════════════════════════════════════════════════════
+
+import { 冠军实体, 可袭击地点实体, 母畜实体, 领主实体 } from './entities';
+import type { 冠军初始数据, 姓名池配置, 属性系数, 冠军工厂配置, 生育选项, 属性预估范围, 数值范围, 地点名称池, 地点类型配置数据, 地点创建配置, 可袭击地点工厂配置, 运行时实体配置, 
+   生育属性预估, 种族配置数据, 身份配置数据, 母畜工厂配置, 母畜创建配置, 领主工厂配置, 领主创建配置, 身份分布权重, 种族分布权重} from '../types/index';
+
+// ═══════════════════════════════════════════════════════════════
+// 冠军工厂
+// ═══════════════════════════════════════════════════════════════
+
+class 冠军工厂 {
+  private 姓名池: 姓名池配置;
+  private 生育消耗: number;
+  private 随机浮动范围: number;
+  private 前缀概率: number;
+  private 后缀概率: number;
+  private 母畜种族配置: Map<string, 种族配置数据>;
+  private 母畜身份配置: Map<string, 身份配置数据>;
+
+  constructor(
+    配置: 冠军工厂配置 = {
+      冠军姓名池: {
+        前缀: [],
+        主名: [],
+        后缀: [],
+      },
+      生育消耗: 100,
+      属性随机浮动范围: 3,
+      前缀概率: 0.3,
+      后缀概率: 0.2,
+      母畜种族配置: new Map(),
+      母畜身份配置: new Map(),
+    },
+  ) {
+    this.姓名池 = 配置.冠军姓名池;
+    this.生育消耗 = 配置.生育消耗;
+    this.随机浮动范围 = 配置.属性随机浮动范围;
+    this.前缀概率 = 配置.前缀概率;
+    this.后缀概率 = 配置.后缀概率;
+    this.母畜种族配置 = 配置.母畜种族配置;
+    this.母畜身份配置 = 配置.母畜身份配置;
+  }
+
+  // ─── 配置方法 ───
+
+  生成随机姓名(): string {
+    if (this.姓名池?.主名?.length > 0) {
+      const 随机选择 = <T>(数组: T[]): T | string => {
+        if (!数组 || 数组.length === 0) return '';
+        const result = 数组[Math.floor(Math.random() * 数组.length)]!;
+        return result;
+      };
+
+      const 前缀 = Math.random() < this.前缀概率 ? 随机选择(this.姓名池.前缀) : '';
+      const 主名 = 随机选择(this.姓名池.主名);
+      const 后缀 = Math.random() < this.后缀概率 ? 随机选择(this.姓名池.后缀) : '';
+
+      return `${前缀}${主名}${后缀}`.trim();
+    }
+
+    return `冠军_${Date.now().toString(36).slice(-4)}`;
+  }
+
+  // ─── 属性计算辅助 ───
+
+  private 计算随机浮动(): number {
+    const 范围 = this.随机浮动范围;
+    return Math.floor(Math.random() * (范围 * 2 + 1)) - 范围;
+  }
+
+  private 计算属性值(基础值: number, 身份系数: number = 1.0, 种族系数: number = 1.0): number {
+    const 浮动 = this.计算随机浮动();
+    const 原始值 = (基础值 + 浮动) * 身份系数 * 种族系数;
+    return Math.max(1, Math.round(原始值));
+  }
+
+  // ─── 创建方法 ───
+
+  从母畜生育(母畜: 母畜实体, 选项: 生育选项 = {}): 冠军实体 {
+
+    const 母畜身份 = 母畜.获取属性('原身份');
+    const 母畜种族 = 母畜.获取属性('种族');
+    const 总生育力 = 母畜.获取属性('总生育力');
+
+    const 身份系数 = this.母畜身份配置.get(母畜身份)?.生育系数 ?? { 力量: 1.0, 敏捷: 1.0, 智力: 1.0 };
+    const 种族系数 = this.母畜种族配置.get(母畜种族)?.生育系数 ?? { 力量: 1.0, 敏捷: 1.0, 智力: 1.0 };
+
+    const 基础值 = 总生育力 / 5;
+
+    const 力量 = this.计算属性值(基础值, 身份系数.力量, 种族系数.力量);
+    const 敏捷 = this.计算属性值(基础值, 身份系数.敏捷, 种族系数.敏捷);
+    const 智力 = this.计算属性值(基础值, 身份系数.智力, 种族系数.智力);
+
+    const 姓名 = 选项.姓名 ?? this.生成随机姓名();
+
+    const 冠军数据: 冠军初始数据 = {
+      姓名,
+      力量,
+      敏捷,
+      智力,
+      来源: '生育',
+      生母: 母畜.实体ID,
+    };
+
+    const 新冠军 = new 冠军实体(冠军数据);
+    母畜.记录生育冠军(新冠军);
+
+    return 新冠军;
+  }
+
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 母畜工厂
+// ═══════════════════════════════════════════════════════════════
+
+class 母畜工厂 {
+  private 种族配置: Map<string, 种族配置数据>;
+  private 身份配置: Map<string, 身份配置数据>;
+
+  //     种族配置: Map<string, 种族配置数据>;
+    // 身份配置: Map<string, 身份配置数据>;
+
+  constructor(
+    配置: 母畜工厂配置 = {
+      种族配置: new Map(),
+      身份配置: new Map(),
+    },
+  ) {
+    this.种族配置 = 配置.种族配置;
+    this.身份配置 = 配置.身份配置;
+  }
+
+  // ===== 创建方法 =====
+
+  创建母畜(配置: 母畜创建配置 = {}): 母畜实体 {
+    const 种族 = 配置.种族 || this.随机选择种族();
+    const 身份 = 配置.身份 || this.随机选择身份();
+
+    const 母畜 = new 母畜实体({
+      姓名: 配置.姓名 || this.生成随机姓名(种族),
+      种族,
+      年龄: 配置.年龄 ?? this.随机年龄(身份),
+      原身份: 身份,
+      魅力: 配置.魅力 ?? 10,
+      来源: 配置.来源 || '未知',
+      臣服度: 配置.臣服度 ?? 0,
+      淫乱度: 配置.淫乱度 ?? 0,
+      描述: 配置.描述 || this.生成描述(种族, 身份),
+      来源地点ID: 配置.来源地点ID || null,
+      总生育力: 配置.总生育力 || 100,
+      剩余生育力: 配置.剩余生育力 || 配置.总生育力 || 100,
+    });
+
+
+    return 母畜;
+  }
+
+  批量创建母畜(数量: number, 基础配置: 母畜创建配置 = {}): 母畜实体[] {
+    const 结果: 母畜实体[] = [];
+    for (let i = 0; i < 数量; i++) {
+      结果.push(
+        this.创建母畜({
+          ...基础配置,
+        }),
+      );
+    }
+    return 结果;
+  }
+
+  // ===== 辅助方法 =====
+
+  private 随机选择种族(): string {
+    const 种族列表 = [...this.种族配置.keys()];
+    if (种族列表.length === 0) return '人类';
+    return 种族列表[Math.floor(Math.random() * 种族列表.length)]!;
+  }
+
+  private 随机选择身份(): string {
+    const 身份列表 = [...this.身份配置.keys()];
+    if (身份列表.length === 0) return '平民';
+    return 身份列表[Math.floor(Math.random() * 身份列表.length)]!;
+  }
+
+  private 随机年龄(身份: string): number {
+    const 身份数据 = this.身份配置.get(身份);
+    const 最小 = 身份数据?.最小年龄 ?? 18;
+    const 最大 = 身份数据?.最大年龄 ?? 40;
+    return Math.floor(最小 + Math.random() * (最大 - 最小));
+  }
+
+  private 生成随机姓名(种族: string): string {
+    const 种族数据 = this.种族配置.get(种族);
+    const 姓名池 = 种族数据?.姓名池;
+    if (!姓名池) {
+      return `无名女`;
+    }
+
+    if (姓名池.主名?.length > 0) {
+      const 随机选择 = <T>(数组: T[]): T | string => {
+        if (!数组 || 数组.length === 0) return '';
+        return 数组[Math.floor(Math.random() * 数组.length)]!;
+      };
+      const 前缀概率 = 种族数据?.前缀概率 ?? 0;
+      const 后缀概率 = 种族数据?.后缀概率 ?? 0;
+
+      const 前缀 = Math.random() < 前缀概率 ? 随机选择(姓名池.前缀 ?? []) : '';
+      const 主名 = 随机选择(姓名池.主名);
+      const 后缀 = Math.random() < 后缀概率 ? 随机选择(姓名池.后缀 ?? []) : '';
+
+      return `${前缀}${主名}${后缀}`.trim();
+    }
+
+    return `无名女`;
+  }
+
+  private 生成描述(种族: string, 身份: string): string {
+    return `一位 ${种族} ${身份}`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 领主工厂
+// ═══════════════════════════════════════════════════════════════
+
+class 领主工厂 {
+  private 默认配置: { 魔力: number; 最大魔力: number; 姓名: string };
+
+  constructor(
+    配置: 领主工厂配置 = {
+      初始魔力: 0,
+      最大魔力: 100,
+      默认姓名: '无名领主',
+    },
+  ) {
+    this.默认配置 = {
+      魔力: 配置.初始魔力,
+      最大魔力: 配置.最大魔力,
+      姓名: 配置.默认姓名,
+    };
+  }
+
+  创建领主(配置: 领主创建配置 = {}): 领主实体 {
+    return new 领主实体({
+      ...this.默认配置,
+      ...配置,
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 可袭击地点工厂
+// ═══════════════════════════════════════════════════════════════
+
+class 可袭击地点工厂 {
+  private 地点类型配置: Map<string, 地点类型配置数据>;
+  private 母畜工厂: 母畜工厂 | null;
+
+  constructor(配置: 可袭击地点工厂配置 = {}) {
+    this.地点类型配置 = 配置.地点类型配置 ?? new Map();
+    this.母畜工厂 = null;
+  }
+
+  设置母畜工厂(工厂: 母畜工厂): void {
+    this.母畜工厂 = 工厂;
+  }
+
+  创建地点(类型: string, 配置: 地点创建配置 = {}): 可袭击地点实体 {
+    if (!this.地点类型配置.has(类型)) {
+      throw new Error(`未知的地点类型: ${类型}`);
+    }
+    const 类型配置 = this.地点类型配置.get(类型)!;
+
+    const 战斗力范围 = 类型配置.战斗力范围;
+    const 战斗力 = 战斗力范围
+      ? Math.floor(Math.random() * (战斗力范围.最大 - 战斗力范围.最小 + 1)) + 战斗力范围.最小
+      : 0;
+
+    const 地点 = new 可袭击地点实体({
+      地点名称: 配置.名称 || this.生成地点名称(类型),
+      地点类型: 类型,
+      描述: 配置.描述 || 类型配置.地点名称池.描述 || '一个神秘的地点',
+      战斗力: 配置.战斗力 ?? 战斗力,
+      侦察进度: 配置.侦察进度 ?? 0,
+      侦察最大值: 配置.侦察最大值 ?? 类型配置.侦察最大值 ?? 100,
+    });
+
+    if (this.母畜工厂) {
+      this.填充潜在母畜(地点, 类型配置, 配置);
+    }
+
+    return 地点;
+  }
+
+  private 填充潜在母畜(可袭击地点: 可袭击地点实体, 类型配置: 地点类型配置数据, 额外配置: 地点创建配置 = {}): void {
+    const 母畜数量范围 = 类型配置.母畜数量范围;
+    const 数量 =
+      额外配置.母畜数量 ?? 母畜数量范围
+        ? Math.floor(Math.random() * (母畜数量范围.最大 - 母畜数量范围.最小 + 1)) + 母畜数量范围.最小
+        : 5;
+    const 身份分布 = 类型配置.身份分布 || { 平民: 1 };
+    const 种族分布 = 类型配置.种族分布 || { 人类: 1 };
+
+    for (let i = 0; i < 数量; i++) {
+      const 身份 = this.按权重选择(身份分布) ?? '平民';
+      const 种族 = this.按权重选择(种族分布) ?? '人类';
+      const 母畜 = this.母畜工厂!.创建母畜({
+        身份: 身份,
+        种族: 种族,
+        来源地点ID: 可袭击地点.实体ID,
+      });
+      可袭击地点.添加潜在母畜(母畜);
+    }
+  }
+
+  private 按权重选择(权重对象: Record<string, number>): string | null {
+    const 条目 = Object.entries(权重对象);
+    const 总权重 = 条目.reduce((sum, [, w]) => sum + w, 0);
+    let 随机值 = Math.random() * 总权重;
+
+    for (const [选项, 权重] of 条目) {
+      随机值 -= 权重;
+      if (随机值 <= 0) return 选项;
+    }
+    return 条目[0]?.[0] ?? null;
+  }
+
+  private 生成地点名称(类型: string): string {
+    const 地点名称池 = this.地点类型配置.get(类型)?.地点名称池;
+    const 前缀列表 = 地点名称池?.前缀 ?? ['东'];
+    const 中缀列表 = 地点名称池?.中缀 ?? ['德'];
+    const 后缀列表 = 地点名称池?.后缀 ?? ['镇'];
+
+    const 随机取 = <T>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)]!;
+    return `${随机取(前缀列表)}${随机取(中缀列表)}${随机取(后缀列表)}`;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 工厂管理器
+// ═══════════════════════════════════════════════════════════════
+
+class 工厂管理器 {
+  readonly 冠军工厂: 冠军工厂;
+  readonly 母畜工厂: 母畜工厂;
+  readonly 领主工厂: 领主工厂;
+  readonly 可袭击地点工厂: 可袭击地点工厂;
+
+  constructor(运行时配置: 运行时实体配置 = {}) {
+    this.冠军工厂 = new 冠军工厂(运行时配置.冠军配置);
+    this.母畜工厂 = new 母畜工厂(运行时配置.母畜配置);
+    this.领主工厂 = new 领主工厂(运行时配置.领主配置);
+    this.可袭击地点工厂 = new 可袭击地点工厂(运行时配置.地点配置);
+    this.可袭击地点工厂.设置母畜工厂(this.母畜工厂);
+  }
+
+  // ─── 工厂访问 ───
+
+  获取冠军工厂(): 冠军工厂 {
+    return this.冠军工厂;
+  }
+
+  获取母畜工厂(): 母畜工厂 {
+    return this.母畜工厂;
+  }
+
+  获取领主工厂(): 领主工厂 {
+    return this.领主工厂;
+  }
+
+  获取可袭击地点工厂(): 可袭击地点工厂 {
+    return this.可袭击地点工厂;
+  }
+
+  // ─── 快捷创建方法 ───
+
+  创建母畜(配置: 母畜创建配置): 母畜实体 {
+    return this.母畜工厂.创建母畜(配置);
+  }
+
+  创建领主(配置: 领主创建配置): 领主实体 {
+    return this.领主工厂.创建领主(配置);
+  }
+
+  创建可袭击地点(类型: string, 配置: 地点创建配置): 可袭击地点实体 {
+    return this.可袭击地点工厂.创建地点(类型, 配置);
+  }
+
+  从母畜生育哥布林冠军(母畜: 母畜实体, 选项: 生育选项): 冠军实体 {
+    return this.冠军工厂.从母畜生育(母畜, 选项);
+  }
+
+  // ─── 批量操作 ───
+
+  批量创建母畜(数量: number, 配置: 母畜创建配置): 母畜实体[] {
+    return this.母畜工厂.批量创建母畜(数量, 配置);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 导出
+// ═══════════════════════════════════════════════════════════════
+
+export { 冠军工厂, 可袭击地点工厂, 工厂管理器, 母畜工厂, 领主工厂 };
+
+export type {
+  冠军工厂配置,
+  可袭击地点工厂配置,
+  地点创建配置,
+  地点类型配置数据,
+  姓名池配置,
+  属性系数,
+  母畜创建配置,
+  母畜工厂配置,
+  生育属性预估,
+  生育选项,
+  运行时实体配置 as 运行时配置接口,
+  领主创建配置,
+  领主工厂配置,
+};
+
+// ═══════════════════════════════════════════════════════════════
+// core/managers.ts
+// 游戏系统管理器 - 任务、法术、黑市调度层
+// ═══════════════════════════════════════════════════════════════
+
+import { 冠军实体, 母畜实体, 可袭击地点实体, 领主实体, 喽啰池实体, 实体基类 } from './entities';
+
+import { 工厂管理器 } from './factories';
+
+
+import type {
+  实体类型, 可执行实体, 可目标实体, 武装等级, 任务前置条件, 任务执行结果, 战斗结果, 回合结算摘要,
+  任务配置, 已发布任务, 任务结算结果,
+  法术执行结果, 法术配置, 法术使用记录, 商品执行效果结果, 商品配置, 商品实例, 奴隶商品, 奴隶刷新配置, 购买结果, 奴隶购买结果, 游戏总控接口, 运行时实体配置, 商品购买记录
+} from '../types/index';
+
+import type {
+  分配请求, 分配结果, 战斗部署,
+  战斗配置, 快速填充结果, 资源状态, 实体统计
+} from '../types/';
+import type { 游戏初始化配置 } from '@/types/controller';
+import type { s } from 'vite/dist/node/chunks/moduleRunnerTransport';
+
+
+// ═══════════════════════════════════════════════════════════════
+// 任务管理器
+// ═══════════════════════════════════════════════════════════════
+
+class 任务管理器 {
+  private 任务注册表: Map<string, 任务配置>;
+  private 已发布任务列表: Map<string, 已发布任务>;
+  private 被占用执行人: Set<string>;
+  private 被占用目标: Set<string>;
+  private 任务计数器: number;
+  private 游戏总控: 游戏总控接口 | null;
+
+  constructor() {
+    this.任务注册表 = new Map();
+    this.已发布任务列表 = new Map();
+    this.被占用执行人 = new Set();
+    this.被占用目标 = new Set();
+    this.任务计数器 = 0;
+    this.游戏总控 = null;
+  }
+
+  // ─── 初始化 ───
+
+  设置游戏总控(总控: 游戏总控接口): void {
+    this.游戏总控 = 总控;
+  }
+
+  // ─── 任务注册（由 rules.ts 调用）───
+
+  注册任务(任务名: string, 配置: 任务配置): void {
+    this.任务注册表.set(任务名, 配置);
+  }
+
+  获取任务配置(任务名: string): 任务配置 | undefined {
+    return this.任务注册表.get(任务名);
+  }
+
+  获取所有任务名(): string[] {
+    return Array.from(this.任务注册表.keys());
+  }
+
+  // ─── 占用状态查询 ───
+
+
+  占用实体(实体: 实体类型): void {
+    this.被占用目标.add(实体.实体ID);
+  }
+  释放实体(实体: 实体类型): void {
+    this.被占用目标.delete(实体.实体ID);
+  }
+
+  执行人是否被占用(执行人ID: string): boolean {
+    return this.被占用执行人.has(执行人ID);
+  }
+
+  目标是否被占用(目标ID: string): boolean {
+    return this.被占用目标.has(目标ID);
+  }
+
+  是否被占用(ID: string): boolean {
+    if (this.游戏总控?.实体管理.获取实体(ID)?.实体类型 === '可袭击地点') return false
+    return this.被占用执行人.has(ID) || this.被占用目标.has(ID);
+  }
+
+  获取可用执行人<T extends 可执行实体>(执行人列表: T[]): T[] {
+    return 执行人列表.filter(e => !this.被占用执行人.has(e.实体ID));
+  }
+
+  获取可用目标<T extends 实体基类>(目标列表: T[]): T[] {
+    return 目标列表.filter(t => !this.被占用目标.has(t.实体ID));
+  }
+
+  // ─── 前置条件检查 ───
+
+  检查前置条件(任务名: string, 执行人: 可执行实体): { 通过: boolean; 失败原因?: string } {
+    const 配置 = this.任务注册表.get(任务名);
+    if (!配置) {
+      return { 通过: false, 失败原因: '任务不存在' };
+    }
+
+    if (this.被占用执行人.has(执行人.实体ID)) {
+      return { 通过: false, 失败原因: '执行人已被占用' };
+    }
+
+    const 条件 = 配置.前置条件;
+    if (条件.类型 && !条件.类型(执行人)) {
+      return { 通过: false, 失败原因: '执行人类型不正确' };
+    } 
+    if (条件.淫乱度 && !条件.淫乱度(执行人)){
+      return { 通过: false, 失败原因: '淫乱度不足' };
+    }
+    if (条件.生育力 && !条件.生育力(执行人)){
+      return { 通过: false, 失败原因: '淫乱度不足' };
+    }
+    if (条件.臣服度 && !条件.臣服度(执行人)){
+      return { 通过: false, 失败原因: '淫乱度不足' };
+    }
+
+    return { 通过: true };
+  }
+
+  // ─── 任务发布 ───
+
+  发布任务(
+    任务名: string,
+    执行人: 可执行实体,
+    目标: 可目标实体 = null,
+  ): { 成功: boolean; 任务ID?: string; 原因?: string } {
+    // 检查任务存在
+    const 配置 = this.任务注册表.get(任务名);
+    if (!配置) {
+      return { 成功: false, 原因: '任务不存在' };
+    }
+
+    // 检查执行人占用
+    if (this.是否被占用(执行人.实体ID)) {
+      return { 成功: false, 原因: '执行人已被占用' };
+    }
+
+    // 检查目标占用
+    if (目标 && this.是否被占用(目标.实体ID)) {
+      return { 成功: false, 原因: '目标已被占用' };
+    }
+
+    // 前置条件
+    const 条件检查 = this.检查前置条件(任务名, 执行人);
+    if (!条件检查.通过) {
+      return { 成功: false, 原因: 条件检查.失败原因 };
+    }
+
+    // 计算行动力占用
+    const 行动力 = 配置.行动力占用 ? 配置.行动力占用(执行人) : 1;
+
+    // 生成任务ID
+    this.任务计数器++;
+    const 任务ID = `task_${Date.now()}_${this.任务计数器}`;
+
+    // 创建任务记录
+    const 任务记录: 已发布任务 = {
+      任务ID,
+      任务名,
+      执行人ID: 执行人.实体ID,
+      目标ID: 目标?.实体ID ?? null,
+      行动力占用: 行动力,
+      发布时间: Date.now(),
+      执行人: 执行人,
+      目标: 目标,
+    };
+
+    // 注册任务和占用
+    this.已发布任务列表.set(任务ID, 任务记录);
+    this.被占用执行人.add(执行人.实体ID);
+    if (目标) {
+      this.被占用目标.add(目标.实体ID);
+    }
+
+    return { 成功: true, 任务ID };
+  }
+
+
+  // ─── 任务取消 ───
+
+  取消任务(任务ID: string): { 成功: boolean; 原因?: string } {
+    const 任务 = this.已发布任务列表.get(任务ID);
+    if (!任务) {
+      return { 成功: false, 原因: '任务不存在' };
+    }
+
+    // 释放占用
+    this.被占用执行人.delete(任务.执行人ID);
+    if (任务.目标ID) {
+      this.被占用目标.delete(任务.目标ID);
+    }
+
+    // 移除任务
+    this.已发布任务列表.delete(任务ID);
+
+    return { 成功: true };
+  }
+
+  // ─── 任务修改 ───
+
+  修改任务(任务ID: string, 新执行人?: 可执行实体, 新目标?: 可目标实体): { 成功: boolean; 原因?: string } {
+    const 任务 = this.已发布任务列表.get(任务ID);
+    if (!任务) {
+      return { 成功: false, 原因: '任务不存在' };
+    }
+
+    const 配置 = this.任务注册表.get(任务.任务名);
+    if (!配置) {
+      return { 成功: false, 原因: '任务配置不存在' };
+    }
+
+    // 如果更换执行人
+    if (新执行人 && 新执行人.实体ID !== 任务.执行人ID) {
+      if (this.被占用执行人.has(新执行人.实体ID)) {
+        return { 成功: false, 原因: '新执行人已被占用' };
+      }
+
+      // 检查前置条件
+      const 条件检查 = this.检查前置条件(任务.任务名, 新执行人);
+      if (!条件检查.通过) {
+        return { 成功: false, 原因: 条件检查.失败原因 };
+      }
+
+      // 释放旧执行人，占用新执行人
+      this.被占用执行人.delete(任务.执行人ID);
+      this.被占用执行人.add(新执行人.实体ID);
+      任务.执行人ID = 新执行人.实体ID;
+
+      // 重新计算行动力
+      任务.行动力占用 = 配置.行动力占用 ? 配置.行动力占用(新执行人) : 1;
+    }
+
+    // 如果更换目标
+    if (新目标 !== undefined) {
+      const 新目标ID = 新目标?.实体ID ?? null;
+      if (新目标ID !== 任务.目标ID) {
+        if (新目标 && this.被占用目标.has(新目标.实体ID)) {
+          return { 成功: false, 原因: '新目标已被占用' };
+        }
+
+        // 释放旧目标
+        if (任务.目标ID) {
+          this.被占用目标.delete(任务.目标ID);
+        }
+
+        // 占用新目标
+        if (新目标) {
+          this.被占用目标.add(新目标.实体ID);
+        }
+
+        任务.目标ID = 新目标ID;
+      }
+    }
+
+    return { 成功: true };
+  }
+
+  // ─── 回合结算 ───
+
+  结算所有任务(): 任务结算结果[] {
+    if (!this.游戏总控) {
+      throw new Error('游戏总控未设置');
+    }
+
+    const 结果列表: 任务结算结果[] = [];
+
+    // 按发布时间排序
+    const 排序任务 = Array.from(this.已发布任务列表.values()).sort((a, b) => a.发布时间 - b.发布时间);
+
+    for (const 任务 of 排序任务) {
+      const 配置 = this.任务注册表.get(任务.任务名);
+      if (!配置) continue;
+
+      // 获取执行人实体
+      const 执行人实体 = this.游戏总控.实体管理.获取实体(任务.执行人ID) as 可执行实体 | null;
+      if (!执行人实体) {
+        结果列表.push({
+          任务ID: 任务.任务ID,
+          结果: {
+            成功: false,
+            类型: 任务.任务名,
+            执行人: null as unknown as 可执行实体,
+            目标: null,
+            原因: '执行人不存在',
+          },
+        });
+        continue;
+      }
+
+      // 获取目标实体
+      let 目标实体: 可目标实体 = null;
+      if (任务.目标ID) {
+        目标实体 = this.游戏总控.实体管理.获取实体(任务.目标ID) as 可目标实体;
+      }
+
+      // 执行任务
+      const 执行结果 = 配置.执行效果(执行人实体, 目标实体, this.游戏总控);
+
+      结果列表.push({
+        任务ID: 任务.任务ID,
+        结果: 执行结果,
+      });
+    }
+
+  // 清空行动力占用大于0的任务和占用状态，保留行动力占用为0的任务
+  const 任务IDsToRemove: string[] = [];
+  for (const [任务ID, 任务] of this.已发布任务列表.entries()) {
+    if (任务.行动力占用 > 0) {
+      任务IDsToRemove.push(任务ID);
+    }
+  }
+
+  // 移除行动力占用大于0的任务
+  for (const 任务ID of 任务IDsToRemove) {
+    const 任务 = this.已发布任务列表.get(任务ID)!;
+    this.已发布任务列表.delete(任务ID);
+    this.被占用执行人.delete(任务.执行人ID);
+    if (任务.目标ID) {
+      this.被占用目标.delete(任务.目标ID);
+    }
+  }
+
+    return 结果列表;
+  }
+
+  // ─── 查询 ───
+
+  获取总行动力(): number {
+    return 3
+  }
+
+  获取行动力占用(): number {
+    return Math.max(
+      Array.from(this.已发布任务列表.values()).reduce(
+        (总和, 任务) => 总和 + 任务.行动力占用,
+        0
+      ),
+      0
+    );
+  }
+
+  获取剩余行动力(): number {
+    return Math.max(this.获取总行动力() - this.获取行动力占用(), 0);
+  }
+
+
+  获取已发布任务列表(): 已发布任务[] {
+    return Array.from(this.已发布任务列表.values());
+  }
+
+  获取任务(任务ID: string): 已发布任务 | undefined {
+    return this.已发布任务列表.get(任务ID);
+  }
+
+  获取执行人当前任务(执行人ID: string): 已发布任务 | undefined {
+    for (const 任务 of this.已发布任务列表.values()) {
+      if (任务.执行人ID === 执行人ID) return 任务;
+    }
+    return undefined;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 法术管理器
+// ═══════════════════════════════════════════════════════════════
+
+class 法术管理器 {
+  private 法术注册表: Map<string, 法术配置>;
+  private 本回合已使用: boolean;
+  private 本回合使用记录: 法术使用记录[];
+  private 游戏总控: 游戏总控接口 | null;
+
+  constructor() {
+    this.法术注册表 = new Map();
+    this.本回合已使用 = false;
+    this.本回合使用记录 = [];
+    this.游戏总控 = null;
+  }
+
+  // ─── 初始化 ───
+
+  设置游戏总控(总控: 游戏总控接口): void {
+    this.游戏总控 = 总控;
+  }
+
+  // ─── 法术注册（由 rules.ts 调用）───
+
+  注册法术(法术名: string, 配置: 法术配置): void {
+    this.法术注册表.set(法术名, 配置);
+  }
+
+  获取法术配置(法术名: string): 法术配置 | undefined {
+    return this.法术注册表.get(法术名);
+  }
+
+  获取所有法术名(): string[] {
+    return Array.from(this.法术注册表.keys());
+  }
+
+  // ─── 使用限制查询 ───
+
+  本回合可使用法术(): boolean {
+    return !this.本回合已使用;
+  }
+
+  获取本回合使用记录(): 法术使用记录[] {
+    return this.本回合使用记录;
+  }
+
+  // ─── 法术使用 ───
+
+  使用法术(
+    法术名: string,
+    倍率: number,
+    目标: 可目标实体 = null,
+  ): { 成功: boolean; 原因?: string; 结果?: 法术执行结果 } {
+    if (!this.游戏总控) {
+      return { 成功: false, 原因: '游戏总控未设置' };
+    }
+
+    if (this.本回合已使用) {
+      return { 成功: false, 原因: '本回合已使用过法术' };
+    }
+
+    const 配置 = this.法术注册表.get(法术名);
+    if (!配置) {
+      return { 成功: false, 原因: '法术不存在' };
+    }
+
+    // 限制倍率
+    const 实际倍率 = Math.min(Math.max(1, Math.floor(倍率)), 配置.法术倍率上限);
+    const 消耗 = 配置.价格 * 实际倍率;
+
+    // 检查魔力
+    const 领主 = this.游戏总控.领主管理.获取领主();
+    const 当前魔力 = 领主.获取属性('魔力');
+    if (当前魔力 < 消耗) {
+      return { 成功: false, 原因: `魔力不足，需要 ${消耗}，当前 ${当前魔力}` };
+    }
+
+    // 消耗魔力
+    const 消耗结果 = 领主.消耗魔力(消耗);
+    if (!消耗结果.成功) {
+      return { 成功: false, 原因: 消耗结果.原因 };
+    }
+
+    // 执行法术
+    const 执行结果 = 配置.执行效果(实际倍率, 目标, this.游戏总控);
+
+    // 记录使用
+    this.本回合已使用 = true;
+    this.本回合使用记录.push({
+      法术名,
+      倍率: 实际倍率,
+      消耗魔力: 消耗,
+      目标ID: 目标?.实体ID ?? null,
+      信息: 配置.信息,
+    });
+
+    return { 成功: true, 结果: 执行结果 };
+  }
+
+  // ─── 回合重置 ───
+
+  回合重置(): void {
+    this.本回合已使用 = false;
+    this.本回合使用记录 = [];
+  }
+
+  // ─── 预计算 ───
+
+  计算法术消耗(法术名: string, 倍率: number): number | null {
+    const 配置 = this.法术注册表.get(法术名);
+    if (!配置) return null;
+
+    const 实际倍率 = Math.min(Math.max(1, Math.floor(倍率)), 配置.法术倍率上限);
+    return 配置.价格 * 实际倍率;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 资源管理器
+// ═══════════════════════════════════════════════════════════════
+
+class 资源管理器 {
+  private 士气: number;
+  private 最大士气: number;
+  private 催淫母乳: number;
+
+  constructor(初始配置: 游戏初始化配置 = {
+    初始士气: 50,
+    最大士气: 100,
+    初始催淫母乳: 0,
+  }) {
+    this.士气 = 初始配置.初始士气 ?? 50;
+    this.最大士气 = 初始配置.最大士气 ?? 100;
+    this.催淫母乳 = 初始配置.初始催淫母乳 ?? 0;
+  }
+
+  // ─── 士气操作 ───
+
+  获取士气(): number {
+    return this.士气;
+  }
+
+  获取最大士气(): number {
+    return this.最大士气;
+  }
+
+  修改士气(增量: number): number {
+    this.士气 = Math.max(0, Math.min(this.最大士气, this.士气 + 增量));
+    return this.士气;
+  }
+
+  设置士气(值: number): void {
+    this.士气 = Math.max(0, Math.min(this.最大士气, 值));
+  }
+
+  设置最大士气(值: number): void {
+    this.最大士气 = Math.max(0, 值);
+    if (this.士气 > this.最大士气) {
+      this.士气 = this.最大士气;
+    }
+  }
+
+  获取士气百分比(): number {
+    return this.最大士气 > 0 ? (this.士气 / this.最大士气) * 100 : 0;
+  }
+
+  // ─── 催淫母乳操作 ───
+
+  获取催淫母乳数量(): number {
+    return this.催淫母乳;
+  }
+
+  修改催淫母乳数量(增量: number): number {
+    this.催淫母乳 = Math.max(0, this.催淫母乳 + 增量);
+    return this.催淫母乳;
+  }
+
+  设置催淫母乳数量(值: number): void {
+    this.催淫母乳 = Math.max(0, 值);
+  }
+
+  // ─── 状态查询 ───
+
+  获取资源状态(): 资源状态 {
+    return {
+      士气: this.士气,
+      最大士气: this.最大士气,
+      催淫母乳: this.催淫母乳,
+    };
+  }
+
+  // ─── 回合结算 ───
+
+  回合结算(): void {
+    const 衰减上限 = 10;
+    const 理论衰减 = Math.floor(this.士气 / 8)
+    const 衰减 = Math.min(理论衰减, 衰减上限);
+    this.修改士气(-衰减);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 实体管理器
+// ═══════════════════════════════════════════════════════════════
+
+class 实体管理器 {
+  private 领主实例: 领主实体 | null;
+  private 冠军表: Map<string, 冠军实体>;
+  private 母畜表: Map<string, 母畜实体>;
+  private 地点表: Map<string, 可袭击地点实体>;
+  private 喽啰池表: Map<string, 喽啰池实体>;
+  private 无将领喽啰池: 喽啰池实体;
+  private 武装优先级: 武装等级[];
+
+  constructor() {
+    this.领主实例 = null;
+    this.冠军表 = new Map();
+    this.母畜表 = new Map();
+    this.地点表 = new Map();
+    this.喽啰池表 = new Map();
+    this.无将领喽啰池 = new 喽啰池实体();
+    this.武装优先级 = ['精英武装', '高级武装', '中级武装', '低级武装', '未武装'];
+  }
+
+
+
+  // ─── 领主管理 ───
+
+  设置领主(领主: 领主实体): void {
+    this.领主实例 = 领主;
+  }
+
+  获取领主(): 领主实体 | null {
+    return this.领主实例;
+  }
+
+  // ─── 冠军管理 ───
+
+  添加冠军(冠军: 冠军实体): void {
+    this.冠军表.set(冠军.实体ID, 冠军);
+    console.log('添加了', 冠军.实体ID);
+
+    // 注册冠军的喽啰池
+    const 喽啰池实例 = 冠军.获取喽啰池();
+    if (喽啰池实例) {
+      this.喽啰池表.set(喽啰池实例.实体ID, 喽啰池实例);
+    }
+  }
+
+  移除冠军(冠军ID: string): boolean {
+    const 冠军 = this.冠军表.get(冠军ID);
+    if (!冠军) return false;
+
+    // 移除关联的喽啰池
+    const 喽啰池实例 = 冠军.获取喽啰池();
+    if (喽啰池实例) {
+      this.喽啰池表.delete(喽啰池实例.实体ID);
+    }
+
+    this.冠军表.delete(冠军ID);
+    return true;
+  }
+
+  获取冠军(冠军ID: string): 冠军实体 | null {
+    return this.冠军表.get(冠军ID) ?? null;
+  }
+
+  获取所有冠军(): 冠军实体[] {
+    return Array.from(this.冠军表.values());
+  }
+
+  // ─── 母畜管理 ───
+
+  添加母畜(母畜: 母畜实体): void {
+    this.母畜表.set(母畜.实体ID, 母畜);
+  }
+
+  移除母畜(母畜: 母畜实体): boolean {
+    return this.母畜表.delete(母畜.实体ID);
+  }
+
+  获取母畜(母畜ID: string): 母畜实体 | null {
+    return this.母畜表.get(母畜ID) ?? null;
+  }
+
+  获取所有母畜(): 母畜实体[] {
+    return Array.from(this.母畜表.values());
+  }
+
+  // ─── 地点管理 ───
+
+  添加地点(地点: 可袭击地点实体): void {
+    this.地点表.set(地点.实体ID, 地点);
+  }
+
+  移除地点(地点ID: string): boolean {
+    return this.地点表.delete(地点ID);
+  }
+
+  获取地点(地点ID: string): 可袭击地点实体 | null {
+    return this.地点表.get(地点ID) ?? null;
+  }
+
+  获取所有地点(): 可袭击地点实体[] {
+    return Array.from(this.地点表.values());
+  }
+
+  // ─── 喽啰池管理 ───
+
+  获取无将领喽啰池(): 喽啰池实体 {
+    return this.无将领喽啰池;
+  }
+
+  获取所有将领喽啰池(): Map<string, 喽啰池实体> {
+    const 将领池表 = new Map<string, 喽啰池实体>();
+    for (const [id, 池] of this.喽啰池表) {
+      if (池.获取将领() !== null) {
+        将领池表.set(id, 池);
+      }
+    }
+    return 将领池表;
+  }
+
+  获取喽啰总数(): number {
+    let 总数 = this.无将领喽啰池.获取总数量();
+    for (const 池 of this.喽啰池表.values()) {
+      总数 += 池.获取总数量();
+    }
+    return 总数;
+  }
+
+  分配到将领(将领: 冠军实体, 请求列表: 分配请求[]): 分配结果 {
+    const 目标池 = 将领.获取喽啰池();
+    if (!目标池) {
+      return { 成功: false, 原因: '将领未绑定喽啰池', 实际分配: 0, 分配详情: [] };
+    }
+
+    const 无将领池 = this.获取无将领喽啰池();
+    const 可用容量 = 目标池.获取最大数量() - 目标池.获取总数量();
+
+    if (可用容量 <= 0) {
+      return { 成功: false, 原因: '将领喽啰池已满', 实际分配: 0, 分配详情: [] };
+    }
+
+    let 总分配 = 0;
+    const 分配详情: Array<{ 等级: string; 数量: number }> = [];
+
+    for (const 请求 of 请求列表) {
+      const 剩余容量 = 可用容量 - 总分配;
+      if (剩余容量 <= 0) break;
+
+      const 实际需求 = Math.min(请求.数量, 剩余容量);
+      const 来源数量 = 无将领池.获取分组数量(请求.武装等级);
+      const 实际分配数量 = Math.min(实际需求, 来源数量);
+
+      if (实际分配数量 > 0) {
+        无将领池.减少喽啰(实际分配数量, 请求.武装等级);
+        目标池.增加喽啰(实际分配数量, 请求.武装等级);
+        总分配 += 实际分配数量;
+        分配详情.push({ 等级: 请求.武装等级, 数量: 实际分配数量 });
+      }
+    }
+
+    return {
+      成功: 总分配 > 0,
+      实际分配: 总分配,
+      分配详情,
+    };
+  }
+
+  快速填充到上限(将领输入: 冠军实体 | string): 快速填充结果 {
+    const 将领 = typeof 将领输入 === 'string' ? this.获取冠军(将领输入) : 将领输入;
+    if (!将领) {
+      return { 成功: false, 原因: '没有找到该将领', 填充数量: 0, 当前战斗力: 0, 填充详情: [] };
+    }
+    const 目标池 = 将领.获取喽啰池();
+    if (!目标池) {
+      return { 成功: false, 原因: '将领未绑定喽啰池', 填充数量: 0, 当前战斗力: 0, 填充详情: [] };
+    }
+
+    const 无将领池 = this.获取无将领喽啰池();
+    const 最大容量 = 目标池.获取最大数量();
+    const 当前数量 = 目标池.获取总数量();
+    let 剩余容量 = 最大容量 - 当前数量;
+
+    if (剩余容量 <= 0) {
+      return {
+        成功: true,
+        原因: '喽啰池已满',
+        填充数量: 0,
+        当前战斗力: 目标池.获取战斗力(),
+        填充详情: [],
+      };
+    }
+
+    const 填充详情: Array<{ 等级: string; 数量: number }> = [];
+    let 总填充 = 0;
+
+    // 按战斗力优先级填充
+    for (const 武装等级 of this.武装优先级) {
+      if (剩余容量 <= 0) break;
+
+      const 可用数量 = 无将领池.获取分组数量(武装等级);
+      const 填充数量 = Math.min(可用数量, 剩余容量);
+
+      if (填充数量 > 0) {
+        无将领池.减少喽啰(填充数量, 武装等级);
+        目标池.增加喽啰(填充数量, 武装等级);
+        剩余容量 -= 填充数量;
+        总填充 += 填充数量;
+        填充详情.push({ 等级: 武装等级, 数量: 填充数量 });
+      }
+    }
+
+    return {
+      成功: true,
+      填充数量: 总填充,
+      当前战斗力: 目标池.获取战斗力(),
+      填充详情,
+    };
+  }
+
+  /**
+   * 优化将领喽啰池配置（替换低级武装为高级武装）
+   */
+  优化战斗力配置(将领: 冠军实体): 快速填充结果 {
+    // 先清空再重新填充，确保最优配置
+    this.清空将领喽啰池(将领);
+    return this.快速填充到上限(将领);
+  }
+
+  归还到公共池(将领: 冠军实体, 请求列表: 分配请求[]): 分配结果 {
+    const 来源池 = 将领.获取喽啰池();
+    if (!来源池) {
+      return { 成功: false, 原因: '将领未绑定喽啰池', 实际分配: 0, 分配详情: [] };
+    }
+
+    const 无将领池 = this.获取无将领喽啰池();
+    let 总归还 = 0;
+    const 分配详情: Array<{ 等级: string; 数量: number }> = [];
+
+    for (const 请求 of 请求列表) {
+      const 来源数量 = 来源池.获取分组数量(请求.武装等级);
+      const 实际归还数量 = Math.min(请求.数量, 来源数量);
+
+      if (实际归还数量 > 0) {
+        来源池.减少喽啰(实际归还数量, 请求.武装等级);
+        无将领池.增加喽啰(实际归还数量, 请求.武装等级);
+        总归还 += 实际归还数量;
+        分配详情.push({ 等级: 请求.武装等级, 数量: 实际归还数量 });
+      }
+    }
+
+    return {
+      成功: 总归还 > 0,
+      实际分配: 总归还,
+      分配详情,
+    };
+  }
+
+  /**
+   * 清空将领喽啰池，全部归还公共池
+   */
+  清空将领喽啰池(将领输入: 冠军实体 | string): 分配结果 {
+    const 将领 = typeof 将领输入 === 'string' ? this.获取冠军(将领输入) : 将领输入;
+    if (!将领) {
+      return { 成功: false, 原因: '没有找到该将领', 实际分配: 0, 分配详情: [] };
+    }
+    const 来源池 = 将领.获取喽啰池();
+    if (!来源池) {
+      return { 成功: false, 原因: '将领未绑定喽啰池', 实际分配: 0, 分配详情: [] };
+    }
+
+    const 分组详情 = 来源池.获取分组详情();
+    const 请求列表: 分配请求[] = 分组详情
+      .filter(分组 => 分组.数量 > 0)
+      .map(分组 => ({ 武装等级: 分组.等级, 数量: 分组.数量 }));
+
+    return this.归还到公共池(将领, 请求列表);
+  }
+
+  // ─── 通用 ───
+
+  清空所有实体(): void {
+    this.冠军表.forEach(冠军 => 冠军.销毁());
+    this.母畜表.forEach(母畜 => 母畜.销毁());
+    this.地点表.forEach(地点 => 地点.销毁());
+    this.喽啰池表.forEach(池 => 池.销毁());
+
+    this.领主实例 = null;
+    this.冠军表.clear();
+    this.母畜表.clear();
+    this.地点表.clear();
+    this.喽啰池表.clear();
+
+    this.无将领喽啰池 = new 喽啰池实体();
+  }
+
+  获取实体(实体ID: string): 实体类型 | null {
+    // 检查领主
+    if (this.领主实例?.实体ID === 实体ID) {
+      return this.领主实例;
+    }
+
+    // 检查冠军
+    if (this.冠军表.has(实体ID)) {
+      return this.冠军表.get(实体ID)!;
+    }
+
+    // 检查母畜
+    if (this.母畜表.has(实体ID)) {
+      return this.母畜表.get(实体ID)!;
+    }
+
+    // 检查地点
+    if (this.地点表.has(实体ID)) {
+      return this.地点表.get(实体ID)!;
+    }
+
+    // 检查地点母畜
+    for (const 地点 of this.地点表.values()) {
+      const 已侦查母畜 = 地点.获取已侦查母畜();
+      const 潜在母畜 = 地点.获取潜在母畜();
+
+      if (已侦查母畜.has(实体ID)) {
+        return 已侦查母畜.get(实体ID)!;
+      }
+
+      if (潜在母畜.has(实体ID)) {
+        return 潜在母畜.get(实体ID)!;
+      }
+    }
+
+    // 检查喽啰池
+    if (this.喽啰池表.has(实体ID)) {
+      return this.喽啰池表.get(实体ID)!;
+    }
+
+    if (this.无将领喽啰池.实体ID === 实体ID) {
+      return this.无将领喽啰池;
+    }
+
+    return null;
+  }
+
+  // ─── 统计 ───
+
+  获取实体统计(): 实体统计 {
+    return {
+      领主数量: this.领主实例 ? 1 : 0,
+      冠军数量: this.冠军表.size,
+      母畜数量: this.母畜表.size,
+      地点数量: this.地点表.size,
+      喽啰总数: this.获取喽啰总数(),
+    };
+  }
+
+  批量添加冠军(冠军列表: 冠军实体[]): void {
+    冠军列表.forEach(冠军 => this.添加冠军(冠军));
+  }
+
+  批量添加母畜(母畜列表: 母畜实体[]): void {
+    母畜列表.forEach(母畜 => this.添加母畜(母畜));
+  }
+
+  批量添加地点(地点列表: 可袭击地点实体[]): void {
+    地点列表.forEach(地点 => this.添加地点(地点));
+  }
+}
+
+
+// ═══════════════════════════════════════════════════════════════
+// 战斗管理器
+// ═══════════════════════════════════════════════════════════════
+
+class 战斗管理器 {
+  private 实体管理器: 实体管理器;
+  private 任务管理器: 任务管理器;
+  private 当前部署: Map<string, 战斗部署>;
+  private 选定目标: 可袭击地点实体 | null;
+  private 突袭模式: boolean;
+  是否战斗: boolean;
+
+  // 常量配置
+  private static readonly 普通出战行动力 = 3;
+  private static readonly 突袭出战行动力 = 2;
+  private static readonly 突袭战力系数 = 0.8;
+
+  constructor(实体管理器: 实体管理器, 任务管理器: 任务管理器) {
+    this.实体管理器 = 实体管理器;
+    this.任务管理器 = 任务管理器;
+    this.当前部署 = new Map();
+    this.选定目标 = null;
+    this.突袭模式 = false;
+    this.是否战斗 = false;
+  }
+
+  // ─── 喽啰调配器访问 ───
+
+  // ─── 目标选择 ───
+
+  选择目标(地点输入: 可袭击地点实体 | string): { 成功: boolean; 原因?: string } {
+    let 地点: 可袭击地点实体 | null = null;
+    if (typeof 地点输入 === 'string') {
+      地点 = this.实体管理器.获取地点(地点输入);
+    } else {
+      地点 = 地点输入;
+    }
+
+    if (!地点) {
+      return { 成功: false, 原因: '地点不存在' };
+    }
+
+    this.选定目标 = 地点;
+    return { 成功: true };
+  }
+
+  取消目标选择(): void {
+    this.选定目标 = null;
+  }
+
+  获取选定目标(): 可袭击地点实体 | null {
+    return this.选定目标;
+  }
+
+  // ─── 突袭模式 ───
+
+  设置突袭模式(启用: boolean): void {
+    this.突袭模式 = 启用;
+  }
+
+  获取突袭模式(): boolean {
+    return this.突袭模式;
+  }
+
+  // ─── 将领部署 ───
+
+  /**
+   * 添加将领到出战列表
+   */
+  添加出战将领(将领输入: 冠军实体 | string): { 成功: boolean; 原因?: string } {
+    let 将领: 冠军实体 | null;
+    try {
+      将领 = typeof 将领输入 == 'string' ? this.实体管理器.获取冠军(将领输入) : 将领输入;
+    } catch (error) {
+      return { 成功: false, 原因: '获取将领时发生错误' };
+    }
+
+    if (!将领) {
+      return { 成功: false, 原因: '将领不存在' };
+    }
+
+
+    // 检查是否已部署
+    if (this.当前部署.has(将领.实体ID)) {
+      return { 成功: false, 原因: '将领已在出战列表中' };
+    }
+
+    // 检查任务系统占用
+    if (this.任务管理器.执行人是否被占用(将领.实体ID)) {
+      return { 成功: false, 原因: '将领在任务系统中被占用' };
+    }
+
+    // 检查是否有喽啰池
+    const 喽啰池 = 将领.获取喽啰池();
+    if (!喽啰池) {
+      return { 成功: false, 原因: '将领未绑定喽啰池' };
+    }
+
+    this.任务管理器.占用实体(将领);
+
+    // 计算战斗力
+    const 基础战斗力 = 喽啰池.获取战斗力();
+    const 实际战斗力 = this.突袭模式 ? 基础战斗力 * 战斗管理器.突袭战力系数 : 基础战斗力;
+
+    this.当前部署.set(将领.实体ID, {
+      将领ID: 将领.实体ID,
+      将领,
+      喽啰池,
+      战斗力: 实际战斗力,
+    });
+
+    return { 成功: true };
+  }
+
+  /**
+   * 从出战列表移除将领
+   */
+  移除出战将领(将领输入: 冠军实体 | string): { 成功: boolean; 原因?: string } {
+    let 将领: 冠军实体 | null;
+    try {
+      将领 = typeof 将领输入 == 'string' ? this.实体管理器.获取冠军(将领输入) : 将领输入;
+    } catch (error) {
+      return { 成功: false, 原因: '获取将领时发生错误' };
+    }
+    if (!将领) {
+      return { 成功: false, 原因: '将领不存在' };
+    }
+    const 将领ID = 将领.实体ID;
+    if (!this.当前部署.has(将领ID)) {
+      return { 成功: false, 原因: '将领不在出战列表中' };
+    }
+
+    this.当前部署.delete(将领ID);
+    if (将领) {
+      this.任务管理器.释放实体(将领);
+    }
+    return { 成功: true };
+  }
+
+  /**
+   * 清空出战列表
+   */
+  清空出战列表(): void {
+    this.当前部署.forEach(战斗部署 => {
+      this.移除出战将领(战斗部署.将领ID);
+    });
+  }
+
+  // ─── 查询方法 ───
+
+  获取当前部署列表(): 战斗部署[] {
+    return Array.from(this.当前部署.values());
+  }
+
+  获取可出战将领(所有将领: 冠军实体[]): 冠军实体[] {
+    return 所有将领.filter(将领 => {
+      // 未被任务占用
+      if (this.任务管理器.执行人是否被占用(将领.实体ID)) return false;
+      // 未在当前部署中
+      if (this.当前部署.has(将领.实体ID)) return false;
+      // 有喽啰池
+      if (!将领.获取喽啰池()) return false;
+      return true;
+    });
+  }
+
+  计算总战斗力(): number {
+    let 总战力 = 0;
+    for (const 部署 of this.当前部署.values()) {
+      总战力 += 部署.战斗力;
+    }
+    return 总战力;
+  }
+
+  计算行动力消耗(): number {
+    if (this.当前部署.size === 0) return 0;
+    return this.突袭模式 ? 战斗管理器.突袭出战行动力 : 战斗管理器.普通出战行动力;
+  }
+
+  计算胜率(我方战斗力: number, 敌方战斗力: number, 目标: 可袭击地点实体) {
+    const 战力比 = 我方战斗力 / (敌方战斗力 + 1);
+    const 侦察修正 = Math.min(Math.log(Math.E - 1 + 目标.获取侦察进度() / 目标.获取侦查最大值()), 1);
+    const 基础胜率 = 0.5 + Math.log(战力比);
+    const 胜率 = Math.min(1, Math.max(0, 基础胜率 * 侦察修正));
+    return 胜率;
+  }
+
+  // ─── 战斗预览 ───
+
+  获取战斗预览(): {
+    可执行: boolean;
+    原因?: string;
+    目标?: {
+      名称: string;
+      战斗力: number;
+    };
+    我方?: {
+      总战斗力: number;
+      将领数量: number;
+      行动力消耗: number;
+      突袭模式: boolean;
+    };
+    胜率预估?: number;
+  } {
+    if (!this.选定目标) {
+      return { 可执行: false, 原因: '未选择目标地点' };
+    }
+
+    if (this.当前部署.size === 0) {
+      return { 可执行: false, 原因: '未部署任何将领' };
+    }
+
+    const 敌方战斗力估值 = this.选定目标.获取战斗力估值();
+    const 我方战斗力 = this.计算总战斗力();
+    if (敌方战斗力估值 === null) {
+      return {
+        可执行: true,
+        目标: {
+          名称: this.选定目标.地点名称,
+          战斗力: NaN,
+        },
+        我方: {
+          总战斗力: 我方战斗力,
+          将领数量: this.当前部署.size,
+          行动力消耗: this.计算行动力消耗(),
+          突袭模式: this.突袭模式,
+        },
+        胜率预估: NaN,
+      };;
+    }
+
+
+    // 简单胜率计算
+    const 胜率 = this.计算胜率(我方战斗力, 敌方战斗力估值, this.选定目标);
+
+    return {
+      可执行: true,
+      目标: {
+        名称: this.选定目标.地点名称,
+        战斗力: 敌方战斗力估值,
+      },
+      我方: {
+        总战斗力: 我方战斗力,
+        将领数量: this.当前部署.size,
+        行动力消耗: this.计算行动力消耗(),
+        突袭模式: this.突袭模式,
+      },
+      胜率预估: 胜率,
+    };
+  }
+
+  // ─── 执行战斗 ───
+
+  确认战斗(): {
+    成功: boolean;
+    原因?: string;
+  } {
+    const 战斗预览 = this.获取战斗预览()
+    if (!战斗预览.可执行) {
+      return {
+        成功: false,
+        原因: 战斗预览.原因,
+      };
+    } else {
+      this.是否战斗 = true;
+      return {
+        成功: true,
+        原因: 战斗预览.原因,
+      };;
+    }
+  }
+
+  取消确认(): void {
+    this.是否战斗 = false;
+  }
+
+  执行战斗(): 战斗结果 {
+    // 预检
+    const 预览 = this.获取战斗预览();
+    const 目标 = this.选定目标!;
+    if (!预览.可执行) {
+      return {
+        成功: false,
+        胜利: false,
+        目标: 目标.地点名称,
+        损失: 0,
+        原因: 预览.原因,
+        我方战斗力: 0,
+        敌方战斗力: 0,
+      };
+    }
+
+
+    const 敌方战斗力 = 目标.获取属性('战斗力') as number;
+    const 我方战斗力 = this.计算总战斗力();
+
+    // 战斗判定
+    const 战力比 = 我方战斗力 / (敌方战斗力 + 1);
+    const 胜率 = this.计算胜率(我方战斗力, 敌方战斗力, 目标); // 计算胜率
+
+    const 胜利 = Math.random() < 胜率;
+
+    // 战损计算
+    let 战损比例 = 0;
+    if (胜利) {
+      战损比例 = Math.max(0, Math.min(0.6, (2 - 战力比) * 0.4));
+    } else {
+      战损比例 = Math.min(0.8, (1 / 战力比) * 0.4);
+    }
+
+    let 损失 = 0;
+
+    // 应用战损到各喽啰池
+    for (const 部署 of this.当前部署.values()) {
+      const 池 = 部署.喽啰池;
+      const 分组列表 = 池.获取分组详情();
+
+      for (const 分组 of 分组列表) {
+        损失 = Math.floor(分组.数量 * 战损比例);
+        if (损失 > 0) {
+          池.减少喽啰(损失, 分组.等级);
+        }
+      }
+    }
+
+    // 胜利奖励
+    const 俘获母畜: string[] = [];
+    if (胜利) {
+      // 获取已侦察的母畜
+      const 已侦察母畜 = 目标.获取所有已侦察母畜();
+      for (const 母畜 of 已侦察母畜) {
+        俘获母畜.push(母畜.实体ID);
+        目标.移除已捕获母畜(母畜);
+      }
+    }
+
+    // 清理状态
+    this.清空出战列表();
+    this.是否战斗 = false;
+    return {
+      成功: true,
+      胜利,
+      目标: 目标.地点名称,
+      损失,
+      我方战斗力,
+      敌方战斗力,
+      战损比例,
+      俘获母畜: 胜利 ? 俘获母畜 : undefined,
+    };
+  }
+
+  // ─── 重置 ───
+
+  回合重置(): void {
+    this.清空出战列表();
+    this.选定目标 = null;
+    this.突袭模式 = false;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 黑市管理器
+// ═══════════════════════════════════════════════════════════════
+
+class 黑市管理器 {
+  private 商品注册表: Map<string, 商品配置>;
+  private 商品实例表: Map<string, 商品实例>;
+  private 奴隶货架: Map<string, 奴隶商品>;
+  private 奴隶刷新配置: 奴隶刷新配置 | null;
+  private 游戏总控: 游戏总控接口 | null;
+  private 工厂管理器: 工厂管理器 | null;
+  private 商品计数器: number;
+  private 本回合商品购买记录: 商品购买记录[];
+
+  constructor(配置: 运行时实体配置 = {}) {
+    this.商品注册表 = new Map();
+    this.商品实例表 = new Map();
+    this.奴隶货架 = new Map();
+    this.奴隶刷新配置 = 配置.黑市奴隶刷新配置 ?? null;
+    this.游戏总控 = null;
+    this.工厂管理器 = null;
+    this.商品计数器 = 0;
+    this.本回合商品购买记录 = [];
+  }
+
+  // ─── 初始化 ───
+
+  设置游戏总控(总控: 游戏总控接口): void {
+    this.游戏总控 = 总控;
+  }
+
+  设置工厂管理器(工厂: 工厂管理器): void {
+    this.工厂管理器 = 工厂;
+  }
+
+  设置奴隶刷新配置(配置: 奴隶刷新配置): void {
+    this.奴隶刷新配置 = 配置;
+  }
+
+  // ─── 商品注册（由 rules.ts 调用）───
+
+  注册商品(商品名: string, 配置: 商品配置): void {
+    this.商品注册表.set(商品名, 配置);
+
+    // 创建商品实例
+    this.商品计数器++;
+    const 商品ID = `goods_${商品名}_${this.商品计数器}`;
+    this.商品实例表.set(商品名, {
+      商品ID,
+      配置,
+      本周已购买: 0,
+    });
+  }
+
+  获取商品配置(商品名: string): 商品配置 | undefined {
+    return this.商品注册表.get(商品名);
+  }
+
+  获取所有商品名(): string[] {
+    return Array.from(this.商品注册表.keys());
+  }
+
+  获取本回合购买记录(): 商品购买记录[] {
+    return this.本回合商品购买记录;
+  }
+
+  // ─── 常驻商品购买 ───
+
+  购买商品(商品名: string, 购买数量: number, 目标: 可目标实体 | null = null): 购买结果 {
+    if (!this.游戏总控) {
+      return { 成功: false, 原因: '游戏总控未设置' };
+    }
+
+    const 实例 = this.商品实例表.get(商品名);
+    if (!实例) {
+      return { 成功: false, 原因: '商品不存在' };
+    }
+
+    const 配置 = 实例.配置;
+
+    // 检查限购
+    if (实例.本周已购买 + 购买数量 > 配置.每周限购) {
+      const 剩余 = 配置.每周限购 - 实例.本周已购买;
+      return { 成功: false, 原因: `超出本周限购，剩余可购买 ${剩余}` };
+    }
+
+    // 计算总价
+    const 总价 = 配置.价格 * 购买数量;
+    const 当前母乳数量 = this.游戏总控.资源管理.获取催淫母乳数量();
+    if (当前母乳数量 < 总价) {
+      return { 成功: false, 原因: `母乳数量不足，需要 ${总价}，当前 ${当前母乳数量}` };
+    }
+
+    // 扣除催淫母乳
+    this.游戏总控.资源管理.修改催淫母乳数量(-总价);
+
+    // 执行效果
+    const 执行结果 = 配置.执行效果(购买数量, 目标, this.游戏总控);
+
+    // 更新已购买数量
+    实例.本周已购买 += 购买数量;
+
+    this.本回合商品购买记录.push({
+      商品ID: 实例.商品ID,
+      目标: 执行结果.目标,
+      数量: 购买数量,
+      总价: 总价,
+      信息: 配置.信息,
+    });
+
+
+
+    return {
+      成功: true,
+      消耗催淫母乳: 总价,
+      执行结果,
+    };
+  }
+
+  // ─── 奴隶货架管理 ───
+
+  刷新奴隶货架(): void {
+    if (!this.奴隶刷新配置 || !this.工厂管理器) {
+      return;
+    }
+
+    // 清空旧货架
+    this.奴隶货架.clear();
+
+    // 随机数量
+    const { 最小, 最大 } = this.奴隶刷新配置.刷新数量范围;
+    const 数量 = Math.floor(Math.random() * (最大 - 最小 + 1)) + 最小;
+
+    // 生成新奴隶
+    for (let i = 0; i < 数量; i++) {
+      const 母畜 = this.工厂管理器.创建母畜({
+        来源: '黑市',
+      });
+
+      const 价格 = this.奴隶刷新配置.价格计算(母畜);
+      const 商品ID = `slave_${Date.now()}_${i}`;
+
+      this.奴隶货架.set(商品ID, {
+        商品ID,
+        母畜实体: 母畜,
+        价格,
+        已售出: false,
+      });
+    }
+  }
+
+  获取奴隶货架(): 奴隶商品[] {
+    return Array.from(this.奴隶货架.values()).filter(s => !s.已售出);
+  }
+
+  购买奴隶(商品ID: string): 奴隶购买结果 {
+    if (!this.游戏总控) {
+      return { 成功: false, 原因: '游戏总控未设置' };
+    }
+
+    const 奴隶 = this.奴隶货架.get(商品ID);
+    if (!奴隶) {
+      return { 成功: false, 原因: '奴隶商品不存在' };
+    }
+
+    if (奴隶.已售出) {
+      return { 成功: false, 原因: '该奴隶已售出' };
+    }
+
+    // 检查催淫母乳
+    const 当前催淫母乳 = this.游戏总控.资源管理.获取催淫母乳数量();
+    if (当前催淫母乳 < 奴隶.价格) {
+      return { 成功: false, 原因: `催淫母乳不足，需要 ${奴隶.价格}，当前 ${当前催淫母乳}` };
+    }
+
+    // 扣除催淫母乳
+    this.游戏总控.资源管理.修改催淫母乳数量(-奴隶.价格);
+
+    // 标记售出
+    奴隶.已售出 = true;
+
+    // 加入玩家母畜列表
+    this.游戏总控.母畜管理.从劝诱获取母畜(奴隶.母畜实体);
+
+    this.本回合商品购买记录.push({
+      商品ID: 奴隶.商品ID,
+      目标: null,
+      数量: 1,
+      总价: 奴隶.价格,
+      信息: `从黑市购买了 ${奴隶.母畜实体.获取属性('姓名')}`,
+    })
+
+    return {
+      成功: true,
+      消耗催淫母乳: 奴隶.价格,
+      获得母畜: 奴隶.母畜实体,
+    };
+  }
+
+  // ─── 回合重置 ───
+
+  回合重置(): void {
+    // 重置所有商品的本周购买数
+    for (const 实例 of this.商品实例表.values()) {
+      实例.本周已购买 = 0;
+    }
+
+    this.本回合商品购买记录 = [];
+
+    // 刷新奴隶货架
+    this.刷新奴隶货架();
+  }
+
+  // ─── 查询 ───
+
+  获取商品可购买数量(商品名: string): number | null {
+    const 实例 = this.商品实例表.get(商品名);
+    if (!实例) return null;
+    return 实例.配置.每周限购 - 实例.本周已购买;
+  }
+
+  获取商品已购买数量(商品名: string): number | null {
+    const 实例 = this.商品实例表.get(商品名);
+    if (!实例) return null;
+    return 实例.本周已购买;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 回合管理器
+// ═══════════════════════════════════════════════════════════════
+
+
+
+class 回合管理器 {
+  private 当前回合: number;
+  private 任务管理器: 任务管理器 | null;
+  private 法术管理器: 法术管理器 | null;
+  private 黑市管理器: 黑市管理器 | null;
+  private 战斗管理器: 战斗管理器 | null;
+  private 资源管理器: 资源管理器 | null;
+  private 已经初始化: boolean;
+
+  constructor() {
+    this.当前回合 = 0;
+    this.任务管理器 = null;
+    this.法术管理器 = null;
+    this.黑市管理器 = null;
+    this.战斗管理器 = null;
+    this.资源管理器 = null;
+    this.已经初始化 = false;
+  }
+
+  初始化(任务管理: 任务管理器, 法术管理: 法术管理器, 黑市管理: 黑市管理器, 战斗管理: 战斗管理器, 资源管理: 资源管理器): void {
+    this.当前回合 = 0;
+    this.任务管理器 = 任务管理;
+    this.法术管理器 = 法术管理;
+    this.黑市管理器 = 黑市管理;
+    this.战斗管理器 = 战斗管理;
+    this.资源管理器 = 资源管理;
+    this.已经初始化 = true;
+  }
+
+  获取当前回合(): number {
+    return this.当前回合;
+  }
+  设置当前回合(回合数: number): void {
+    this.当前回合 = Math.max(0, Math.floor(回合数));
+  }
+
+  结束回合(): 回合结算摘要 {
+    if (!this.法术管理器 || !this.任务管理器 || !this.黑市管理器 || !this.战斗管理器 || !this.资源管理器) {
+      throw new Error('未初始化');
+    }
+    // 获取法术记录
+    const 法术记录 = this.法术管理器.获取本回合使用记录();
+    const 法术信息: string[] = 法术记录
+      .filter(记录 => 记录.信息)
+      .map(记录 => 记录.信息!)
+    // 结算任务
+    const 任务结果 = this.任务管理器.结算所有任务();
+    const 任务信息: string[] = 任务结果
+      .filter((记录) => 记录.结果.信息)
+      .map((记录) => 记录.结果.信息!);
+ 
+    const 商品结果 = this.黑市管理器.获取本回合购买记录();
+    const 商品信息: string[] = 商品结果
+      .filter((记录) => 记录.信息)
+      .map((记录) => 记录.信息!);
+
+    let 战斗结果 = null;
+
+    if (this.战斗管理器.是否战斗) {
+      战斗结果 = this.战斗管理器.执行战斗();
+    }
+    const 战斗信息:string[] = [];
+    if (战斗结果?.成功) {
+      战斗信息.push(`针对${战斗结果.目标}的战斗获胜了，俘获了了${战斗结果.俘获母畜?.join('、')}，损失了${战斗结果.损失}个喽啰`);
+    } else if (战斗结果) {
+      战斗信息.push(`针对${战斗结果.目标}的战斗失败了，损失了${战斗结果.损失}个喽啰`);
+    }
+    
+
+    this.当前回合++;
+
+    // 重置各系统
+    this.法术管理器.回合重置();
+    this.黑市管理器.回合重置();
+    this.战斗管理器.回合重置();
+
+    return {
+      回合数: this.当前回合,
+      任务记录: 任务信息,
+      法术记录: 法术信息,
+      商品记录: 商品信息,
+      战斗记录: 战斗信息,
+    };
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 导出
+// ═══════════════════════════════════════════════════════════════
+
+export { 任务管理器, 法术管理器, 黑市管理器, 回合管理器, 战斗管理器, 资源管理器, 实体管理器 };
+
+
+// ═══════════════════════════════════════════════════════════════
+// core/persistence.ts
+// 存读档系统 - 游戏状态的序列化与反序列化
+// ═══════════════════════════════════════════════════════════════
+
+import {
+    冠军实体,
+    可袭击地点实体,
+    喽啰池实体,
+    母畜实体,
+    领主实体
+} from './entities';
+import { 工厂管理器 } from './factories';
+import { 游戏总控 } from '../game/controller';
+import type { 武装等级 } from '../types/common';
+
+// ═══════════════════════════════════════════════════════════════
+// 序列化数据结构定义
+// ═══════════════════════════════════════════════════════════════
+
+/** 领主序列化数据 */
+interface 领主存档数据 {
+    实体ID: string;
+    姓名: string;
+    魔力: number;
+    最大魔力: number;
+}
+
+/** 冠军序列化数据 */
+interface 冠军存档数据 {
+    实体ID: string;
+    姓名: string;
+    性别: string;
+    力量: number;
+    敏捷: number;
+    智力: number;
+    来源: string;
+    生母: string | null;
+    喽啰池数据: 喽啰池存档数据 | null;
+}
+
+/** 喽啰池序列化数据 */
+interface 喽啰池存档数据 {
+    实体ID: string;
+    将领ID: string | null;
+    武装分组: Array<{
+        等级: 武装等级;
+        数量: number;
+    }>;
+}
+
+/** 母畜序列化数据 */
+interface 母畜存档数据 {
+    实体ID: string;
+    姓名: string;
+    种族: string;
+    年龄: number;
+    原身份: string;
+    来源: string;
+    描述: string;
+    总生育力: number;
+    剩余生育力: number;
+    淫乱度: number;
+    臣服度: number;
+    魅力: number;
+    特性列表: string[];
+    来源地点ID: string | null;
+    冠军生育记录: string[];
+    喽啰生育记录: number;
+}
+
+/** 可袭击地点序列化数据 */
+interface 地点存档数据 {
+    实体ID: string;
+    地点名称: string;
+    地点类型: string;
+    描述: string;
+    侦察最大值: number;
+    侦察进度: number;
+    战斗力: number;
+    战斗力估值: number | null;
+    潜在母畜列表: 母畜存档数据[];
+    已侦察母畜列表: 母畜存档数据[];
+}
+
+/** 资源状态存档数据 */
+interface 资源存档数据 {
+    士气: number;
+    最大士气: number;
+    催淫母乳: number;
+}
+
+/** 完整游戏存档数据 */
+interface 游戏存档数据 {
+    版本号: string;
+    存档时间: number;
+    存档名称: string;
+    回合数: number;
+    领主: 领主存档数据;
+    冠军列表: 冠军存档数据[];
+    母畜列表: 母畜存档数据[];
+    地点列表: 地点存档数据[];
+    无将领喽啰池: 喽啰池存档数据;
+    资源状态: 资源存档数据;
+}
+
+/** 存档槽位信息 */
+interface 存档槽位 {
+    槽位索引: number;
+    存档名称: string;
+    存档时间: number;
+    回合数: number;
+    领主姓名: string;
+    冠军数量: number;
+    母畜数量: number;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 序列化器 - 将游戏实体转换为可存储的数据
+// ═══════════════════════════════════════════════════════════════
+
+class 游戏序列化器 {
+    private static readonly 当前版本 = '1.0.0';
+
+    // ─── 实体序列化 ───
+
+    static 序列化领主(领主: 领主实体): 领主存档数据 {
+        return {
+            实体ID: 领主.实体ID,
+            姓名: 领主.获取属性('姓名'),
+            魔力: 领主.获取属性('魔力'),
+            最大魔力: 领主.获取属性('最大魔力'),
+        };
+    }
+
+    static 序列化喽啰池(喽啰池: 喽啰池实体): 喽啰池存档数据 {
+        const 分组数据: Array<{ 等级: 武装等级; 数量: number }> = [];
+
+        喽啰池.武装分组.forEach((数据, 等级) => {
+            if (数据.数量 > 0) {
+                分组数据.push({ 等级, 数量: 数据.数量 });
+            }
+        });
+
+        return {
+            实体ID: 喽啰池.实体ID,
+            将领ID: 喽啰池.获取将领()?.实体ID ?? null,
+            武装分组: 分组数据,
+        };
+    }
+
+    static 序列化冠军(冠军: 冠军实体): 冠军存档数据 {
+        const 喽啰池 = 冠军.获取喽啰池();
+
+        return {
+            实体ID: 冠军.实体ID,
+            姓名: 冠军.获取属性('姓名'),
+            性别: 冠军.获取属性('性别'),
+            力量: 冠军.获取属性('力量'),
+            敏捷: 冠军.获取属性('敏捷'),
+            智力: 冠军.获取属性('智力'),
+            来源: 冠军.获取属性('来源'),
+            生母: 冠军.生母,
+            喽啰池数据: 喽啰池 ? this.序列化喽啰池(喽啰池) : null,
+        };
+    }
+
+    static 序列化母畜(母畜: 母畜实体): 母畜存档数据 {
+        return {
+            实体ID: 母畜.实体ID,
+            姓名: 母畜.获取属性('姓名'),
+            种族: 母畜.获取属性('种族'),
+            年龄: 母畜.获取属性('年龄'),
+            原身份: 母畜.获取属性('原身份'),
+            来源: 母畜.获取属性('来源'),
+            描述: 母畜.获取属性('描述'),
+            总生育力: 母畜.获取属性('总生育力'),
+            剩余生育力: 母畜.获取属性('剩余生育力'),
+            淫乱度: 母畜.获取属性('淫乱度'),
+            臣服度: 母畜.获取属性('臣服度'),
+            魅力: 母畜.获取属性('魅力'),
+            特性列表: Array.from(母畜.特性列表),
+            来源地点ID: 母畜.来源地点ID,
+            冠军生育记录: 母畜.冠军生育记录,
+            喽啰生育记录: 母畜.喽啰生育记录,
+        };
+    }
+
+    static 序列化地点(地点: 可袭击地点实体): 地点存档数据 {
+        const 潜在母畜: 母畜存档数据[] = [];
+        const 已侦察母畜: 母畜存档数据[] = [];
+
+        地点.获取潜在母畜().forEach(母畜 => {
+            潜在母畜.push(this.序列化母畜(母畜));
+        });
+
+        地点.获取所有已侦察母畜().forEach(母畜 => {
+            已侦察母畜.push(this.序列化母畜(母畜));
+        });
+
+        return {
+            实体ID: 地点.实体ID,
+            地点名称: 地点.地点名称,
+            地点类型: 地点.地点类型,
+            描述: 地点.描述,
+            侦察最大值: 地点.侦察最大值,
+            侦察进度: 地点.侦察进度,
+            战斗力: 地点.获取属性('战斗力'),
+            战斗力估值: 地点.获取战斗力估值(),
+            潜在母畜列表: 潜在母畜,
+            已侦察母畜列表: 已侦察母畜,
+        };
+    }
+
+    // ─── 完整游戏状态序列化 ───
+
+    static 序列化游戏(游戏: 游戏总控, 存档名称: string = '快速存档'): 游戏存档数据 {
+        const 实体管理器 = 游戏.系统管理.获取实体管理器();
+        const 资源管理器 = 游戏.系统管理.获取资源管理器();
+        const 回合管理器 = 游戏.系统管理.获取回合管理器();
+
+        // 序列化所有冠军
+        const 冠军列表: 冠军存档数据[] = [];
+        实体管理器.获取所有冠军().forEach(冠军 => {
+            冠军列表.push(this.序列化冠军(冠军));
+        });
+
+        // 序列化玩家拥有的母畜
+        const 母畜列表: 母畜存档数据[] = [];
+        实体管理器.获取所有母畜().forEach(母畜 => {
+            母畜列表.push(this.序列化母畜(母畜));
+        });
+
+        // 序列化地点（包含地点内的潜在母畜和已侦察母畜）
+        const 地点列表: 地点存档数据[] = [];
+        实体管理器.获取所有地点().forEach(地点 => {
+            地点列表.push(this.序列化地点(地点));
+        });
+
+        return {
+            版本号: this.当前版本,
+            存档时间: Date.now(),
+            存档名称,
+            回合数: 回合管理器.获取当前回合(),
+            领主: this.序列化领主(游戏.领主管理.获取领主()),
+            冠军列表,
+            母畜列表,
+            地点列表,
+            无将领喽啰池: this.序列化喽啰池(实体管理器.获取无将领喽啰池()),
+            资源状态: 资源管理器.获取资源状态(),
+        };
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 反序列化器 - 从存档数据重建游戏实体
+// ═══════════════════════════════════════════════════════════════
+
+class 游戏反序列化器 {
+    private 工厂管理器: 工厂管理器;
+    private 实体ID映射: Map<string, string>; // 旧ID -> 新ID
+
+    constructor(工厂管理器: 工厂管理器) {
+        this.工厂管理器 = 工厂管理器;
+        this.实体ID映射 = new Map();
+    }
+
+    // ─── 实体重建 ───
+
+    重建母畜(数据: 母畜存档数据, 保持原ID: boolean = false): 母畜实体 {
+        const 母畜 = new 母畜实体({
+            实体ID: 数据.实体ID,
+            姓名: 数据.姓名,
+            种族: 数据.种族,
+            年龄: 数据.年龄,
+            原身份: 数据.原身份,
+            来源: 数据.来源,
+            描述: 数据.描述,
+            总生育力: 数据.总生育力,
+            剩余生育力: 数据.剩余生育力,
+            淫乱度: 数据.淫乱度,
+            臣服度: 数据.臣服度,
+            魅力: 数据.魅力,
+            特性列表: 数据.特性列表,
+            来源地点ID: 数据.来源地点ID,
+            冠军生育记录: 数据.冠军生育记录,
+            喽啰生育记录: 数据.喽啰生育记录,
+        });
+
+        // 记录ID映射（用于后续引用修复）
+        this.实体ID映射.set(数据.实体ID, 母畜.实体ID);
+
+        return 母畜;
+    }
+
+    重建冠军(数据: 冠军存档数据): 冠军实体 {
+        const 冠军 = new 冠军实体({
+            姓名: 数据.姓名,
+            性别: 数据.性别,
+            力量: 数据.力量,
+            敏捷: 数据.敏捷,
+            智力: 数据.智力,
+            来源: 数据.来源,
+            生母: 数据.生母,
+        });
+
+        // 重建喽啰池数据
+        if (数据.喽啰池数据) {
+            const 喽啰池 = 冠军.获取喽啰池();
+            数据.喽啰池数据.武装分组.forEach(分组 => {
+                喽啰池.增加喽啰(分组.数量, 分组.等级);
+            });
+        }
+
+        this.实体ID映射.set(数据.实体ID, 冠军.实体ID);
+
+        return 冠军;
+    }
+
+    重建地点(数据: 地点存档数据): 可袭击地点实体 {
+        const 地点 = new 可袭击地点实体({
+            地点名称: 数据.地点名称,
+            地点类型: 数据.地点类型,
+            描述: 数据.描述,
+            侦察最大值: 数据.侦察最大值,
+            侦察进度: 数据.侦察进度,
+            战斗力: 数据.战斗力,
+        });
+
+        // 重建潜在母畜
+        数据.潜在母畜列表.forEach(母畜数据 => {
+            const 母畜 = this.重建母畜(母畜数据);
+            地点.添加潜在母畜(母畜);
+        });
+
+        // 重建已侦察母畜（需要先添加到潜在池再标记为已侦察）
+        数据.已侦察母畜列表.forEach(母畜数据 => {
+            const 母畜 = this.重建母畜(母畜数据);
+            地点.添加潜在母畜(母畜);
+            地点.标记母畜已侦察(母畜);
+        });
+
+        // 恢复战斗力估值
+        if (数据.战斗力估值 !== null) {
+            地点.增加侦察进度(0); // 触发估值计算
+            // 直接设置估值（需要在实体类中添加setter或这里用类型断言）
+            (地点 as any).战斗力估值 = 数据.战斗力估值;
+        }
+
+        this.实体ID映射.set(数据.实体ID, 地点.实体ID);
+
+        return 地点;
+    }
+
+    重建领主(数据: 领主存档数据): 领主实体 {
+        const 领主 = new 领主实体({
+            姓名: 数据.姓名,
+            魔力: 数据.魔力,
+            最大魔力: 数据.最大魔力,
+        });
+
+        this.实体ID映射.set(数据.实体ID, 领主.实体ID);
+
+        return 领主;
+    }
+
+    // ─── 完整游戏重建 ───
+
+    重建游戏(存档数据: 游戏存档数据, 游戏实例: 游戏总控): void {
+        this.实体ID映射.clear();
+
+        const 实体管理器 = 游戏实例.系统管理.获取实体管理器();
+        const 资源管理器 = 游戏实例.系统管理.获取资源管理器();
+
+        // 1. 重建领主
+        const 领主 = this.重建领主(存档数据.领主);
+        游戏实例.领主管理.设置领主(领主);
+
+        // 2. 重建无将领喽啰池
+        const 无将领池 = 实体管理器.获取无将领喽啰池();
+        存档数据.无将领喽啰池.武装分组.forEach(分组 => {
+            无将领池.增加喽啰(分组.数量, 分组.等级);
+        });
+
+        // 3. 重建冠军
+        存档数据.冠军列表.forEach(冠军数据 => {
+            const 冠军 = this.重建冠军(冠军数据);
+            实体管理器.添加冠军(冠军);
+        });
+
+        // 4. 重建玩家拥有的母畜
+        存档数据.母畜列表.forEach(母畜数据 => {
+            const 母畜 = this.重建母畜(母畜数据);
+            实体管理器.添加母畜(母畜);
+        });
+
+        // 5. 重建地点
+        存档数据.地点列表.forEach(地点数据 => {
+            const 地点 = this.重建地点(地点数据);
+            实体管理器.添加地点(地点);
+        });
+
+        // 6. 恢复资源状态
+        资源管理器.设置士气(存档数据.资源状态.士气);
+        资源管理器.设置最大士气(存档数据.资源状态.最大士气);
+        资源管理器.设置催淫母乳数量(存档数据.资源状态.催淫母乳);
+
+        // 7. 恢复回合数（需要在回合管理器中添加setter）
+        const 回合管理器 = 游戏实例.系统管理.获取回合管理器();
+        (回合管理器 as any).当前回合 = 存档数据.回合数;
+    }
+
+    // ─── 获取ID映射 ───
+
+    获取新实体ID(旧ID: string): string | undefined {
+        return this.实体ID映射.get(旧ID);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 存档管理器 - 处理存档的存储、读取、管理
+// ═══════════════════════════════════════════════════════════════
+
+class 存档管理器 {
+    private static readonly 存档前缀 = 'goblin_game_save_';
+    private static readonly 最大槽位数 = 10;
+    private static readonly 自动存档槽位 = 0;
+
+    private 工厂管理器: 工厂管理器;
+
+    constructor(工厂管理器: 工厂管理器) {
+        this.工厂管理器 = 工厂管理器;
+    }
+
+    // ─── 存档操作 ───
+
+    获取存档数据(游戏: 游戏总控, 存档名称?: string): 游戏存档数据 | null{        
+    try {
+        const 存档数据 = 游戏序列化器.序列化游戏(
+            游戏,
+            存档名称 ?? `快速存档`
+        );
+
+        return 存档数据;
+    } catch (错误) {
+        console.error('保存游戏失败:', 错误);
+        return null;
+    }
+
+    }
+
+    加载存档数据(游戏存档数据:游戏存档数据, 游戏: 游戏总控): boolean{
+        try {
+            // 清空当前游戏状态
+            this.清空游戏状态(游戏);
+
+            // 重建游戏
+            const 反序列化器 = new 游戏反序列化器(this.工厂管理器);
+            反序列化器.重建游戏(游戏存档数据, 游戏);
+
+            return true;
+        } catch (错误) {
+            console.error('加载存档失败:', 错误);
+            return false;
+        }
+    }
+
+    /**
+     * 保存游戏到指定槽位
+     */
+    保存游戏(游戏: 游戏总控, 槽位: number, 存档名称?: string): { 成功: boolean; 原因?: string } {
+        if (槽位 < 0 || 槽位 >= 存档管理器.最大槽位数) {
+            return { 成功: false, 原因: '无效的存档槽位' };
+        }
+
+        try {
+            const 存档数据 = 游戏序列化器.序列化游戏(
+                游戏,
+                存档名称 ?? `存档 ${槽位}`
+            );
+
+            const 存档JSON = JSON.stringify(存档数据);
+            const 存档键 = this.获取存档键(槽位);
+
+            console.log('保存游戏数据:', 存档JSON);
+
+            localStorage.setItem(存档键, 存档JSON);
+
+            return { 成功: true };
+        } catch (错误) {
+            console.error('保存游戏失败:', 错误);
+            return { 成功: false, 原因: `保存失败: ${错误}` };
+        }
+    }
+
+    /**
+     * 自动存档
+     */
+    自动存档(游戏: 游戏总控): { 成功: boolean; 原因?: string } {
+        return this.保存游戏(游戏, 存档管理器.自动存档槽位, '自动存档');
+    }
+
+    /**
+     * 从指定槽位读取存档
+     */
+    读取存档(槽位: number): { 成功: boolean; 数据?: 游戏存档数据; 原因?: string } {
+        if (槽位 < 0 || 槽位 >= 存档管理器.最大槽位数) {
+            return { 成功: false, 原因: '无效的存档槽位' };
+        }
+
+        try {
+            const 存档键 = this.获取存档键(槽位);
+            const 存档JSON = localStorage.getItem(存档键);
+
+            if (!存档JSON) {
+                return { 成功: false, 原因: '存档不存在' };
+            }
+
+            const 存档数据: 游戏存档数据 = JSON.parse(存档JSON);
+
+            // 版本兼容性检查
+            if (!this.检查版本兼容性(存档数据.版本号)) {
+                return { 成功: false, 原因: '存档版本不兼容' };
+            }
+
+            return { 成功: true, 数据: 存档数据 };
+        } catch (错误) {
+            console.error('读取存档失败:', 错误);
+            return { 成功: false, 原因: `读取失败: ${错误}` };
+        }
+    }
+
+    /**
+     * 加载存档到游戏实例
+     */
+    加载存档(槽位: number, 游戏: 游戏总控): { 成功: boolean; 原因?: string } {
+        const 读取结果 = this.读取存档(槽位);
+
+        if (!读取结果.成功 || !读取结果.数据) {
+            return { 成功: false, 原因: 读取结果.原因 };
+        }
+
+        try {
+            // 清空当前游戏状态
+            this.清空游戏状态(游戏);
+
+            // 重建游戏
+            const 反序列化器 = new 游戏反序列化器(this.工厂管理器);
+            反序列化器.重建游戏(读取结果.数据, 游戏);
+
+            return { 成功: true };
+        } catch (错误) {
+            console.error('加载存档失败:', 错误);
+            return { 成功: false, 原因: `加载失败: ${错误}` };
+        }
+    }
+
+    /**
+     * 删除存档
+     */
+    删除存档(槽位: number): { 成功: boolean; 原因?: string } {
+        if (槽位 < 0 || 槽位 >= 存档管理器.最大槽位数) {
+            return { 成功: false, 原因: '无效的存档槽位' };
+        }
+
+        try {
+            const 存档键 = this.获取存档键(槽位);
+            localStorage.removeItem(存档键);
+            return { 成功: true };
+        } catch (错误) {
+            return { 成功: false, 原因: `删除失败: ${错误}` };
+        }
+    }
+
+    // ─── 存档信息查询 ───
+
+    /**
+     * 获取所有存档槽位信息
+     */
+    获取所有存档信息(): 存档槽位[] {
+        const 槽位列表: 存档槽位[] = [];
+
+        for (let i = 0; i < 存档管理器.最大槽位数; i++) {
+            const 槽位信息 = this.获取存档槽位信息(i);
+            if (槽位信息) {
+                槽位列表.push(槽位信息);
+            }
+        }
+
+        return 槽位列表;
+    }
+
+    /**
+     * 获取指定槽位的存档信息（不加载完整数据）
+     */
+    获取存档槽位信息(槽位: number): 存档槽位 | null {
+        try {
+            const 存档键 = this.获取存档键(槽位);
+            const 存档JSON = localStorage.getItem(存档键);
+
+            if (!存档JSON) {
+                return null;
+            }
+
+            const 存档数据: 游戏存档数据 = JSON.parse(存档JSON);
+
+            return {
+                槽位索引: 槽位,
+                存档名称: 存档数据.存档名称,
+                存档时间: 存档数据.存档时间,
+                回合数: 存档数据.回合数,
+                领主姓名: 存档数据.领主.姓名,
+                冠军数量: 存档数据.冠军列表.length,
+                母畜数量: 存档数据.母畜列表.length,
+            };
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * 检查槽位是否有存档
+     */
+    存档存在(槽位: number): boolean {
+        const 存档键 = this.获取存档键(槽位);
+        return localStorage.getItem(存档键) !== null;
+    }
+
+    // ─── 导入导出 ───
+
+    /**
+     * 导出存档为JSON字符串（用于备份或分享）
+     */
+    导出存档(游戏: 游戏总控): string {
+        const 存档数据 = 游戏序列化器.序列化游戏(游戏, '导出存档');
+        return JSON.stringify(存档数据, null, 2);
+    }
+
+    /**
+     * 导出存档并下载为文件
+     */
+    导出存档为文件(游戏: 游戏总控, 文件名?: string): void {
+        const 存档JSON = this.导出存档(游戏);
+        const blob = new Blob([存档JSON], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+
+        const 链接 = document.createElement('a');
+        链接.href = url;
+        链接.download = 文件名 ?? `goblin_save_${Date.now()}.json`;
+        链接.click();
+
+        URL.revokeObjectURL(url);
+    }
+
+    /**
+     * 从JSON字符串导入存档
+     */
+    导入存档(存档JSON: string): { 成功: boolean; 数据?: 游戏存档数据; 原因?: string } {
+        try {
+            const 存档数据: 游戏存档数据 = JSON.parse(存档JSON);
+
+            // 验证存档结构
+            if (!this.验证存档结构(存档数据)) {
+                return { 成功: false, 原因: '存档结构无效' };
+            }
+
+            // 版本兼容性检查
+            if (!this.检查版本兼容性(存档数据.版本号)) {
+                return { 成功: false, 原因: '存档版本不兼容' };
+            }
+
+            return { 成功: true, 数据: 存档数据 };
+        } catch (错误) {
+            return { 成功: false, 原因: `解析失败: ${错误}` };
+        }
+    }
+
+    /**
+     * 从文件导入存档
+     */
+    async 从文件导入存档(文件: File): Promise<{ 成功: boolean; 数据?: 游戏存档数据; 原因?: string }> {
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+
+            reader.onload = (事件) => {
+                const 内容 = 事件.target?.result as string;
+                resolve(this.导入存档(内容));
+            };
+
+            reader.onerror = () => {
+                resolve({ 成功: false, 原因: '文件读取失败' });
+            };
+
+            reader.readAsText(文件);
+        });
+    }
+
+    /**
+     * 导入并加载存档到游戏
+     */
+    导入并加载存档(存档JSON: string, 游戏: 游戏总控): { 成功: boolean; 原因?: string } {
+        const 导入结果 = this.导入存档(存档JSON);
+
+        if (!导入结果.成功 || !导入结果.数据) {
+            return { 成功: false, 原因: 导入结果.原因 };
+        }
+
+        try {
+            this.清空游戏状态(游戏);
+
+            const 反序列化器 = new 游戏反序列化器(this.工厂管理器);
+            反序列化器.重建游戏(导入结果.数据, 游戏);
+
+            return { 成功: true };
+        } catch (错误) {
+            return { 成功: false, 原因: `加载失败: ${错误}` };
+        }
+    }
+
+    // ─── 辅助方法 ───
+
+    private 获取存档键(槽位: number): string {
+        return `${存档管理器.存档前缀}${槽位}`;
+    }
+
+    private 检查版本兼容性(版本号: string): boolean {
+        // 简单的版本兼容性检查，未来可扩展为语义化版本比较
+        const 当前主版本 = '1';
+        const 存档主版本 = 版本号.split('.')[0];
+        return 当前主版本 === 存档主版本;
+    }
+
+    private 验证存档结构(数据: any): 数据 is 游戏存档数据 {
+        return (
+            typeof 数据 === 'object' &&
+            typeof 数据.版本号 === 'string' &&
+            typeof 数据.存档时间 === 'number' &&
+            typeof 数据.回合数 === 'number' &&
+            typeof 数据.领主 === 'object' &&
+            Array.isArray(数据.冠军列表) &&
+            Array.isArray(数据.母畜列表) &&
+            Array.isArray(数据.地点列表) &&
+            typeof 数据.无将领喽啰池 === 'object' &&
+            typeof 数据.资源状态 === 'object'
+        );
+    }
+
+    private 清空游戏状态(游戏: 游戏总控): void {
+        const 实体管理器 = 游戏.系统管理.获取实体管理器();
+
+        // 清空所有实体
+        // 注意：这需要在实体管理器中添加清空方法
+        // 这里假设实体管理器有对应的清空方法
+        (实体管理器 as any).清空所有实体?.();
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 导出
+// ═══════════════════════════════════════════════════════════════
+
+export {
+    游戏序列化器,
+    游戏反序列化器,
+    存档管理器,
+};
+
+export type {
+    游戏存档数据,
+    存档槽位,
+    领主存档数据,
+    冠军存档数据,
+    母畜存档数据,
+    地点存档数据,
+    喽啰池存档数据,
+    资源存档数据,
+};
+
+// ═══════════════════════════════════════════════════════════════
+// data/config.ts
+// 游戏运行时配置 - 所有游戏数据的集中定义
+// ═══════════════════════════════════════════════════════════════
+
+import type { 母畜实体 } from '@/core/entities';
+import type { 属性系数, 姓名池配置, 种族配置数据, 身份配置数据, 地点名称池, 地点类型配置数据, 运行时实体配置, 冠军工厂配置, 母畜工厂配置, 可袭击地点工厂配置, 武装分组数据, 武装等级, 奴隶刷新配置 as 奴隶刷新配置接口, 母畜创建配置 } from '../types/index';
+
+
+// ═══════════════════════════════════════════════════════════════
+// 母畜配置
+// ═══════════════════════════════════════════════════════════════
+
+// 各种族的姓名生成配置
+const 种族配置 = new Map<string, 种族配置数据>([
+    ['人类', {
+        姓名池: {
+            前缀: [],
+            主名: [
+                '艾拉', '莉娜', '索菲亚', '伊莎贝尔', '维多利亚',
+                '艾米莉', '夏洛特', '奥利维亚', '艾玛', '阿梅莉亚',
+                '玛格丽特', '凯瑟琳', '伊丽莎白', '安娜', '玛丽亚',
+                '海伦', '朱莉亚', '塞西莉亚', '罗莎琳德', '比阿特丽斯'
+            ],
+            后缀: []
+        },
+        前缀概率: 0,
+        后缀概率: 0,
+        生育系数: { 力量: 1.0, 敏捷: 1.0, 智力: 1.0 },
+        生育力基础值: 100,
+        魅力系数: 1.0
+    }],
+    ['精灵', {
+        姓名池: {
+            前缀: ['艾', '莱', '希', '露', '菲'],
+            主名: [
+                '瑞尔', '洛丝', '兰希尔', '缇娜', '蕾雅',
+                '温蒂', '诗琳', '月华', '星澜', '晨曦',
+                '薇儿', '妮丝', '蒂亚', '莉丝', '塔莉亚'
+            ],
+            后缀: ['安', '娜', '雅', '丝', '恩']
+        },
+        前缀概率: 0.6,
+        后缀概率: 0.8,
+        生育系数: { 力量: 1.0, 敏捷: 1.0, 智力: 1.0 },
+        生育力基础值: 100,
+        魅力系数: 1.0
+    }],
+]);
+
+// 各身份的年龄范围配置
+const 身份配置 = new Map<string, 身份配置数据>([
+    ['贵族', {
+        最小年龄: 16,
+        最大年龄: 45,
+        生育系数: { 力量: 1.0, 敏捷: 1.0, 智力: 1.0 },
+        生育力系数: 1.0,
+        魅力基础值: 100
+    }],
+]);
+
+const 母畜配置: 母畜工厂配置 = {
+    种族配置,
+    身份配置,
+};
+
+// ═══════════════════════════════════════════════════════════════
+// 冠军配置
+// ═══════════════════════════════════════════════════════════════
+
+const 冠军姓名池: 姓名池配置 = {
+    前缀: [
+        '狂暴', '嗜血', '铁皮', '利爪', '毒牙',
+        '碎骨', '裂颅', '噬魂', '暗影', '腐烂',
+        '疯狂', '凶残', '狡诈', '贪婪', '堕落'
+    ],
+    主名: [
+        '格鲁克', '莫格', '扎格', '斯纳加', '戈布',
+        '纳兹', '古尔', '布拉格', '克拉克', '沃格',
+        '吉克', '尼克', '里克', '比克', '迪克',
+        '托克', '博克', '洛克', '索克', '霍克'
+    ],
+    后缀: [
+        '碎骨者', '噬魂者', '裂颅者', '割喉者', '剥皮者',
+        '吞噬者', '践踏者', '毁灭者', '征服者', '掠夺者'
+    ]
+};
+
+const 冠军配置: 冠军工厂配置 = {
+    冠军姓名池: 冠军姓名池,
+    生育消耗: 100,
+    属性随机浮动范围: 5,
+    前缀概率: 0.35,
+    后缀概率: 0.25,
+    母畜身份配置: 身份配置,
+    母畜种族配置: 种族配置,
+};
+
+// ═══════════════════════════════════════════════════════════════
+// 地点配置
+// ═══════════════════════════════════════════════════════════════
+
+
+const 地点类型配置 = new Map<string, 地点类型配置数据>([
+    ['偏僻村庄', {
+        地点名称池: {
+            描述: '一个偏远的小村庄，人口稀少，防御薄弱',
+            前缀: ['东', '西', '南', '北', '上', '下', '老', '新'],
+            中缀: ['柳', '杨', '槐', '桃', '梨', '麦', '稻', '草', '石', '木'],
+            后缀: ['村', '庄', '屯', '寨', '坳', '湾', '沟', '岭']
+        },
+        战斗力范围: { 最小: 50, 最大: 150 },
+        侦察最大值: 60,
+        母畜数量范围: { 最小: 3, 最大: 8 },
+        身份分布: {
+            '农妇': 5,
+            '平民': 3,
+            '女仆': 1,
+            '商人': 0.5
+        },
+        种族分布: {
+            '人类': 8,
+            '半精灵': 1,
+            '兽人': 0.5,
+            '猫人': 0.5
+        }
+    }],
+    ['边境村落', {
+        地点名称池: {
+            描述: '位于王国边境的村落，居民多为混血或异族',
+            前缀: ['边', '界', '荒', '野', '远'],
+            中缀: ['狼', '熊', '鹿', '虎', '豹', '荆', '棘', '岩', '沙'],
+            后缀: ['村', '镇', '堡', '寨', '营']
+        },
+        战斗力范围: { 最小: 100, 最大: 250 },
+        侦察最大值: 80,
+        母畜数量范围: { 最小: 4, 最大: 10 },
+        身份分布: {
+            '猎人': 3,
+            '战士': 2,
+            '农妇': 2,
+            '平民': 2,
+            '盗贼': 1
+        },
+        种族分布: {
+            '人类': 4,
+            '半兽人': 2,
+            '兽人': 1,
+            '狼人': 1,
+            '猫人': 1,
+            '兔人': 1
+        }
+    }],
+    ['商贸小镇', {
+        地点名称池: {
+            描述: '繁忙的商贸小镇，来往商人众多',
+            前缀: ['金', '银', '玉', '宝', '富', '商'],
+            中缀: ['河', '桥', '市', '坊', '街', '巷'],
+            后缀: ['镇', '城', '埠', '港', '集']
+        },
+        战斗力范围: { 最小: 180, 最大: 350 },
+        侦察最大值: 100,
+        母畜数量范围: { 最小: 6, 最大: 15 },
+        身份分布: {
+            '商人': 4,
+            '女仆': 3,
+            '舞娘': 2,
+            '娼妓': 2,
+            '平民': 2,
+            '工匠': 1,
+            '贵族': 0.5
+        },
+        种族分布: {
+            '人类': 6,
+            '半精灵': 2,
+            '猫人': 1,
+            '狐人': 1
+        }
+    }],
+    ['贵族庄园', {
+        地点名称池: {
+            描述: '富裕贵族的私人庄园，守卫森严',
+            前缀: ['冯', '德', '范', '圣', '皇'],
+            中缀: ['玫瑰', '百合', '蔷薇', '紫藤', '橡树', '雪松'],
+            后缀: ['庄园', '府邸', '城堡', '宅邸', '别墅']
+        },
+        战斗力范围: { 最小: 300, 最大: 600 },
+        侦察最大值: 150,
+        母畜数量范围: { 最小: 5, 最大: 12 },
+        身份分布: {
+            '贵族': 3,
+            '女仆': 5,
+            '骑士': 1,
+            '舞娘': 1,
+            '平民': 1
+        },
+        种族分布: {
+            '人类': 7,
+            '精灵': 2,
+            '半精灵': 1
+        }
+    }],
+    ['修道院', {
+        地点名称池: {
+            描述: '供奉神明的修道院，充满神圣气息',
+            前缀: ['圣', '神', '光', '白', '银'],
+            中缀: ['十字', '圣杯', '天使', '圣光', '祈祷', '洗礼'],
+            后缀: ['修道院', '圣堂', '教堂', '神殿', '圣所']
+        },
+        战斗力范围: { 最小: 200, 最大: 450 },
+        侦察最大值: 120,
+        母畜数量范围: { 最小: 4, 最大: 10 },
+        身份分布: {
+            '修女': 6,
+            '牧师': 3,
+            '平民': 1
+        },
+        种族分布: {
+            '人类': 8,
+            '精灵': 1,
+            '半精灵': 1
+        }
+    }],
+    ['法师塔', {
+        地点名称池: {
+            描述: '神秘的法师塔，蕴含强大魔力',
+            前缀: ['奥术', '秘法', '星辰', '月光', '暗影', '烈焰', '寒冰'],
+            中缀: ['魔导', '咒文', '符文', '元素', '虚空'],
+            后缀: ['塔', '尖塔', '法塔', '魔塔', '学院']
+        },
+        战斗力范围: { 最小: 400, 最大: 800 },
+        侦察最大值: 200,
+        母畜数量范围: { 最小: 3, 最大: 8 },
+        身份分布: {
+            '法师': 5,
+            '女仆': 2,
+            '平民': 1
+        },
+        种族分布: {
+            '人类': 4,
+            '精灵': 3,
+            '半精灵': 2,
+            '提夫林': 1
+        }
+    }],
+    ['精灵聚落', {
+        地点名称池: {
+            描述: '隐藏在森林深处的精灵聚落',
+            前缀: ['翠绿', '银光', '星落', '月影', '晨露'],
+            中缀: ['橡木', '白桦', '紫藤', '银杏', '红枫', '古树'],
+            后缀: ['林地', '圣域', '密林', '仙境', '绿洲']
+        },
+        战斗力范围: { 最小: 350, 最大: 700 },
+        侦察最大值: 180,
+        母畜数量范围: { 最小: 4, 最大: 10 },
+        身份分布: {
+            '猎人': 3,
+            '法师': 2,
+            '贵族': 2,
+            '战士': 2,
+            '平民': 1
+        },
+        种族分布: {
+            '精灵': 8,
+            '半精灵': 2
+        }
+    }],
+    ['兽人部落', {
+        地点名称池: {
+            描述: '野蛮兽人的部落营地',
+            前缀: ['血', '骨', '牙', '角', '爪'],
+            中缀: ['颅', '腥', '战', '猎', '蛮'],
+            后缀: ['部落', '营地', '巢穴', '据点', '领地']
+        },
+        战斗力范围: { 最小: 250, 最大: 550 },
+        侦察最大值: 100,
+        母畜数量范围: { 最小: 5, 最大: 12 },
+        身份分布: {
+            '战士': 4,
+            '猎人': 3,
+            '平民': 3
+        },
+        种族分布: {
+            '兽人': 5,
+            '半兽人': 3,
+            '狼人': 2
+        }
+    }],
+    ['商队营地', {
+        地点名称池: {
+            描述: '行商队伍的临时营地',
+            前缀: ['东方', '西域', '北地', '南海', '远行'],
+            中缀: ['丝绸', '香料', '珠宝', '皮草', '瓷器'],
+            后缀: ['商队', '车队', '驼队', '旅团', '行商']
+        },
+        战斗力范围: { 最小: 120, 最大: 280 },
+        侦察最大值: 70,
+        母畜数量范围: { 最小: 2, 最大: 6 },
+        身份分布: {
+            '商人': 4,
+            '舞娘': 2,
+            '女仆': 2,
+            '娼妓': 1,
+            '平民': 1
+        },
+        种族分布: {
+            '人类': 5,
+            '猫人': 2,
+            '狐人': 2,
+            '兔人': 1
+        }
+    }],
+    ['矿工营地', {
+        地点名称池: {
+            描述: '采矿工人的临时营地',
+            前缀: ['黑', '铁', '铜', '银', '金', '煤'],
+            中缀: ['矿', '脉', '洞', '坑', '井'],
+            后缀: ['营地', '矿场', '工地', '采掘场', '矿坑']
+        },
+        战斗力范围: { 最小: 150, 最大: 320 },
+        侦察最大值: 80,
+        母畜数量范围: { 最小: 2, 最大: 5 },
+        身份分布: {
+            '工匠': 4,
+            '娼妓': 3,
+            '平民': 2,
+            '女仆': 1
+        },
+        种族分布: {
+            '人类': 5,
+            '矮人': 4,
+            '半兽人': 1
+        }
+    }],
+    ['边境要塞', {
+        地点名称池: {
+            描述: '驻守边境的军事要塞',
+            前缀: ['铁', '钢', '血', '战', '雷'],
+            中缀: ['鹰', '狮', '龙', '狼', '熊'],
+            后缀: ['要塞', '堡垒', '城塞', '关隘', '哨站']
+        },
+        战斗力范围: { 最小: 500, 最大: 1000 },
+        侦察最大值: 200,
+        母畜数量范围: { 最小: 4, 最大: 10 },
+        身份分布: {
+            '骑士': 3,
+            '战士': 3,
+            '娼妓': 2,
+            '女仆': 1,
+            '贵族': 1
+        },
+        种族分布: {
+            '人类': 8,
+            '半兽人': 1,
+            '龙裔': 1
+        }
+    }],
+    ['地下洞窟', {
+        地点名称池: {
+            描述: '神秘的地下洞窟，栖息着各种魔物',
+            前缀: ['幽暗', '深渊', '黑暗', '迷宫', '混沌'],
+            中缀: ['蜘蛛', '蝙蝠', '蘑菇', '水晶', '熔岩'],
+            后缀: ['洞窟', '地穴', '巢穴', '迷宫', '深渊']
+        },
+        战斗力范围: { 最小: 200, 最大: 500 },
+        侦察最大值: 150,
+        母畜数量范围: { 最小: 3, 最大: 8 },
+        身份分布: {
+            '盗贼': 3,
+            '法师': 2,
+            '战士': 2,
+            '平民': 3
+        },
+        种族分布: {
+            '提夫林': 3,
+            '拉米亚': 2,
+            '史莱姆': 2,
+            '人类': 2,
+            '半精灵': 1
+        }
+    }],
+    ['废弃神殿', {
+        地点名称池: {
+            描述: '被遗弃的古老神殿，残留着神秘力量',
+            前缀: ['遗忘', '荒废', '古老', '沉眠', '堕落'],
+            中缀: ['月神', '战神', '丰饶', '死亡', '混乱'],
+            后缀: ['神殿', '圣地', '祭坛', '遗迹', '废墟']
+        },
+        战斗力范围: { 最小: 300, 最大: 650 },
+        侦察最大值: 160,
+        母畜数量范围: { 最小: 3, 最大: 7 },
+        身份分布: {
+            '牧师': 3,
+            '修女': 3,
+            '法师': 2,
+            '平民': 2
+        },
+        种族分布: {
+            '人类': 4,
+            '精灵': 2,
+            '提夫林': 2,
+            '哈比': 1,
+            '拉米亚': 1
+        }
+    }],
+    ['妖精森林', {
+        地点名称池: {
+            描述: '充满魔法气息的妖精森林',
+            前缀: ['迷雾', '梦幻', '彩虹', '月光', '星辉'],
+            中缀: ['妖精', '仙子', '精灵', '花语', '蝶舞'],
+            后缀: ['森林', '仙境', '秘境', '花园', '乐土']
+        },
+        战斗力范围: { 最小: 180, 最大: 400 },
+        侦察最大值: 130,
+        母畜数量范围: { 最小: 5, 最大: 12 },
+        身份分布: {
+            '法师': 3,
+            '舞娘': 3,
+            '平民': 4
+        },
+        种族分布: {
+            '精灵': 3,
+            '狐人': 2,
+            '猫人': 2,
+            '兔人': 2,
+            '哈比': 1
+        }
+    }],
+]);
+
+
+const 地点配置: 可袭击地点工厂配置 = {
+    地点类型配置,
+};
+
+// ═══════════════════════════════════════════════════════════════
+// 领主配置
+// ═══════════════════════════════════════════════════════════════
+
+const 领主配置 = {
+    初始魔力: 10,
+    最大魔力: 100,
+    默认姓名: '无名领主',
+};
+
+// ═══════════════════════════════════════════════════════════════
+// 奴隶配置
+// ═══════════════════════════════════════════════════════════════
+
+export const 奴隶刷新配置: 奴隶刷新配置接口 = {
+    刷新数量范围: { 最小: 2, 最大: 5 },
+    价格计算: (母畜: 母畜实体) => {
+        const 总生育力 = 母畜.获取属性('总生育力');
+        const 基础价格 = Math.floor(总生育力 * 0.8);
+        const 浮动 = Math.floor(Math.random() * 总生育力 * 0.4);
+        return 基础价格 + 浮动;
+    }
+};
+
+// ═══════════════════════════════════════════════════════════════
+// 游戏初始配置
+// ═══════════════════════════════════════════════════════════════
+
+export const 游戏初始配置 = {
+    领主姓名: '哥布林王',
+    初始魔力: 10,
+    初始士气: 50,
+    初始母畜数: 1,
+    初始冠军数: 2,
+    初始催淫母乳: 500,
+    初始喽啰数: 30,
+};
+
+export const 初始地点配置 = {
+    生成数量: 3,
+    可用类型: ['偏僻村庄', '边境村落', '商队营地'],
+};
+
+export const 初始母畜配置: 母畜创建配置[] = [
+    {
+        姓名: '艾莉亚',
+        种族: '人类',
+        身份: '平民',
+        年龄: 20,
+        来源: '20',
+        描述: '20',
+        魅力: 80,
+        臣服度: 95,
+        淫乱度: 80,
+        总生育力: 200,
+        剩余生育力: 150,
+    }
+];
+
+export const 运行时配置: 运行时实体配置 = {
+    冠军配置,
+    母畜配置,
+    领主配置,
+    地点配置,
+    黑市奴隶刷新配置: 奴隶刷新配置,
+};
+
+export {
+    冠军配置,
+    母畜配置,
+    地点配置,
+    领主配置,
+    种族配置,
+    身份配置,
+    地点类型配置,
+};
+
+// ═══════════════════════════════════════════════════════════════
+// data/rules.ts
+// 游戏规则配置实现
+// ═══════════════════════════════════════════════════════════════
+
+import { 冠军实体, 可袭击地点实体, 喽啰池实体, 母畜实体, 领主实体 } from '../core/entities';
+
+import { 工厂管理器 } from '../core/factories';
+
+import type {武装等级, 游戏总控接口, 任务执行结果, 商品执行结果, 法术执行结果, 实体类型, 任务系统接口, 黑市系统接口, 法术系统接口} from '../types/index';
+
+
+// ═══════════════════════════════════════════════════════════════
+// 规则初始化函数
+// ═══════════════════════════════════════════════════════════════
+
+export function 初始化任务法术市场(
+  工厂管理器实例: 工厂管理器,
+  任务系统: 任务系统接口,
+  黑市系统: 黑市系统接口,
+  法术系统: 法术系统接口,
+): void {
+  // ─── 辅助函数 ───
+  const min = Math.min;
+  const floor = Math.floor;
+
+  // ─── 数组洗牌工具 ───
+  const shuffleArray = <T>(array: T[]): T[] => {
+    const result = [...array];
+    for (let i = result.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [result[i], result[j]] = [result[j]!, result[i]!];
+    }
+    return result;
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // 任务配置
+  // ═══════════════════════════════════════════════════════════════
+
+  任务系统.注册任务('调教', {
+    名称: '调教',
+    描述: '冠军对母畜进行调教，提升其臣服度，智力越高，效果越好',
+    执行人实体类型: '冠军实体',
+    目标实体类型: '母畜实体',
+    前置条件: {
+      类型: 执行人 => 执行人.实体类型 === '冠军'
+    },
+    行动力占用: _执行人 => 1,
+    执行效果: (执行人, 目标母畜, _游戏总控) => {
+      const 冠军 = 执行人 as 冠军实体;
+      const 母畜 = 目标母畜 as 母畜实体;
+
+      const 初始值 = 母畜.获取属性('臣服度');
+      const 执行效率 = 冠军.获取效率('智力');
+      const 增量 = floor(执行效率 * 10) + 5;
+      const 新值 = 母畜.修改属性('臣服度', 增量);
+
+      return {
+        成功: true,
+        类型: '调教',
+        执行人: 冠军,
+        目标: 母畜,
+        变化: { 臣服度: [初始值, 新值] },
+        信息: `${冠军.获取属性('姓名')} 对 ${母畜.获取属性('姓名')} 进行了调教，其臣服度增加了 ${增量} 点`,
+      };
+    },
+  });
+
+  任务系统.注册任务('劝慰', {
+    名称: '劝慰',
+    描述: '母畜对其他母畜进行劝慰，提升其臣服度，魅力越高，效果越好',
+    执行人实体类型: '母畜实体',
+    目标实体类型: '母畜实体',
+    前置条件: {
+      类型: 执行人 => 执行人.实体类型 === '母畜',
+      臣服度: 执行人 => (执行人 as 母畜实体).获取属性('臣服度') >= 50,
+    },
+    行动力占用: _执行人 => 1,
+    执行效果: (执行人, 目标母畜, _游戏总控) => {
+      const 执行母畜 = 执行人 as 母畜实体;
+      const 目标 = 目标母畜 as 母畜实体;
+      const 执行效率 = 执行母畜.获取效率('魅力');
+
+      const 初始值 = 目标.获取属性('臣服度');
+      const 基础值 = 执行效率 * 10 + 5;
+      const 种族A = 执行母畜.获取属性('种族');
+      const 种族B = 目标.获取属性('种族');
+      const 系数 = 种族A === 种族B ? 1.25 : 0.8;
+      const 增量 = floor(基础值 * 系数);
+      const 新值 = 目标.修改属性('臣服度', 增量);
+
+      return {
+        成功: true,
+        类型: '劝慰',
+        执行人: 执行母畜,
+        目标: 目标,
+        变化: { 臣服度: [初始值, 新值] },
+        信息: `${执行母畜.获取属性('姓名')} 对 ${目标.获取属性('姓名')} 进行了劝慰，其臣服度增加了 ${增量} 点`,
+      };
+    },
+  });
+
+  任务系统.注册任务('侦察', {
+    名称: '侦察',
+    执行人实体类型: '冠军实体',
+    目标实体类型: '可袭击地点实体',
+    描述: '侦察地点，获取地点内可被侦察的母畜信息，敏捷越高，效果越好',
+    前置条件: {
+      类型: 执行人 => 执行人.实体类型 === '冠军',
+    },
+    执行效果: (执行人, 目标地点, _游戏总控) => {
+      const 冠军 = 执行人 as 冠军实体;
+      const 地点 = 目标地点 as 可袭击地点实体;
+
+      const 执行效率 = 冠军.获取效率('敏捷');
+      const 成功率 = 执行效率 + 0.25;
+
+      if (Math.random() > 成功率) {
+        return {
+          成功: false,
+          类型: '侦察',
+          执行人: 冠军,
+          目标: 地点,
+          信息: `${冠军.获取属性('姓名')} 尝试侦察 ${地点.获取属性('地点名称')}，但是失败了`,
+        };
+      }
+
+      const 初始进度 = 地点.获取侦察进度();
+
+      // 进度增加
+      const 进度增量 = 执行效率 * 10 + 5;
+      const 当前进度 = 地点.增加侦察进度(进度增量);
+
+      // 侦察逻辑
+      const 因子 = (执行效率 + 0.25) * (当前进度 + 25);
+      const 必定侦察数 = floor(因子 / 75);
+      const 额外概率 = (因子 % 75) / 75;
+
+      let 侦察母畜总数 = 必定侦察数 + (Math.random() < 额外概率 ? 1 : 0);
+      const 可侦察母畜列表 = 地点.获取潜在母畜列表();
+      const 随机索引数组 = shuffleArray([...Array(可侦察母畜列表.length).keys()]);
+
+      // 执行地点实体内部的侦察逻辑
+      const 被侦察母畜列表: 母畜实体[] = [];
+      for (let i = 0; i < 侦察母畜总数 && i < 可侦察母畜列表.length; i++) {
+        const 被侦察母畜 = 可侦察母畜列表[随机索引数组[i]!]!;
+        地点.标记母畜已侦察(被侦察母畜);
+        被侦察母畜列表.push(被侦察母畜);
+      }
+
+      return {
+        成功: true,
+        类型: '侦察',
+        执行人: 冠军,
+        目标: 地点,
+        信息: `${冠军.获取属性('姓名')} 侦察了 ${地点.获取属性('地点名称')}，成功发现了 ${被侦察母畜列表.length} 个值得关注度女性`,
+        变化: { 侦察进度: [初始进度, 当前进度] },
+        已侦察母畜: 被侦察母畜列表,
+      };
+    },
+  });
+
+  任务系统.注册任务('潜入侦察', {
+    名称: '潜入侦察',
+    执行人实体类型: '母畜实体',
+    目标实体类型: '可袭击地点实体',
+    描述: '母畜潜入地点，获取地点内可被侦察的母畜信息，魅力越高，效果越好，高淫乱的母畜难以胜任',
+    前置条件: {
+      类型: 执行人 => 执行人.实体类型 === '母畜',
+      臣服度: 执行人 => (执行人 as 母畜实体).获取属性('臣服度') >= 75,
+    },
+    行动力占用: _执行人 => 1,
+    执行效果: (执行人, 目标地点, _游戏总控) => {
+      const 母畜 = 执行人 as 母畜实体;
+      const 魅力效率 = 母畜.获取效率('魅力');
+      const 淫乱惩罚 = 母畜.获取效率('淫乱度惩罚');
+      const 执行效率 = 魅力效率 * 淫乱惩罚;
+      const 地点 = 目标地点 as 可袭击地点实体;
+      const 成功率 = 执行效率 + 0.25;
+
+      if (Math.random() > 成功率) {
+        return {
+          成功: false,
+          类型: '侦察',
+          执行人: 母畜,
+          目标: 地点,
+          信息: `${母畜.获取属性('姓名')} 尝试潜入 ${地点.获取属性('地点名称')}，但是失败了`,
+        };
+      }
+
+      const 初始进度 = 地点.获取侦察进度();
+
+      // 进度增加
+      const 进度增量 = 执行效率 * 10 + 5;
+      const 当前进度 = 地点.增加侦察进度(进度增量);
+
+      // 侦察逻辑
+      const 因子 = (执行效率 + 0.25) * (当前进度 + 25);
+      const 必定侦察数 = floor(因子 / 75);
+      const 额外概率 = (因子 % 75) / 75;
+
+      let 侦察母畜总数 = 必定侦察数 + (Math.random() < 额外概率 ? 1 : 0);
+      const 可侦察母畜列表 = 地点.获取潜在母畜列表();
+      const 随机索引数组 = shuffleArray([...Array(可侦察母畜列表.length).keys()]);
+
+      // 执行地点实体内部的侦察逻辑
+      const 被侦察母畜列表: 母畜实体[] = [];
+      for (let i = 0; i < 侦察母畜总数 && i < 可侦察母畜列表.length; i++) {
+        const 被侦察母畜 = 可侦察母畜列表[随机索引数组[i]!]!;
+        地点.标记母畜已侦察(被侦察母畜);
+        被侦察母畜列表.push(被侦察母畜);
+      }
+
+      return {
+        成功: true,
+        类型: '潜入侦察',
+        执行人: 母畜,
+        目标: 地点,
+        变化: { 侦察进度: [初始进度, 当前进度] },
+        已侦察母畜: 被侦察母畜列表,
+        信息: `${母畜.获取属性('姓名')} 潜入 ${地点.获取属性('地点名称')}，成功发现了 ${被侦察母畜列表.length} 个值得关注度女性`,
+      };
+    },
+  });
+
+  任务系统.注册任务('潜入劝诱', {
+    名称: '潜入劝诱',
+    执行人实体类型: '母畜实体',
+    目标实体类型: '可袭击地点实体-母畜实体',
+    描述: '母畜潜入地点，尝试与目标母畜进行劝诱，魅力越高，效果越好，高淫乱的母畜难以胜任',
+    前置条件: {
+      类型: 执行人 => 执行人.实体类型 === '母畜',
+      臣服度: 执行人 => (执行人 as 母畜实体).获取属性('臣服度') >= 90,
+    },
+    行动力占用: _执行人 => 1,
+    执行效果: (执行人, 目标母畜, 游戏总控) => {
+      const 执行母畜 = 执行人 as 母畜实体;
+      const 目标 = 目标母畜 as 母畜实体;
+
+      const 淫乱度惩罚 = 执行母畜.获取效率('淫乱度惩罚');
+      const 目标地点 = 游戏总控!.地点管理.获取地点(目标.来源地点ID!);
+      const 魅力差 = 执行母畜.获取属性('魅力') - 目标.获取属性('魅力');
+      const 潜入成功率 = 执行母畜.获取效率('魅力') * 淫乱度惩罚
+      const 劝说成功率 = 魅力差 * 魅力差 / 4000;
+      const 随机结果 = Math.random();
+
+      if (Math.random() > 潜入成功率) {
+        return {
+          成功: false,
+          类型: '潜入劝诱',
+          执行人: 执行母畜,
+          目标: 目标,
+          信息: `${执行母畜.获取属性('姓名')} 尝试潜入 ${目标.获取属性('姓名')}，但是失败了`,
+        };
+      }
+      if (Math.random() > 劝说成功率) {
+        return {
+          成功: false,
+          类型: '潜入劝诱',
+          执行人: 执行母畜,
+          目标: 目标,
+          信息: `${执行母畜.获取属性('姓名')} 潜入了 ${目标.获取属性('姓名')}，但没有说服 ${目标.获取属性('姓名')}`,
+        };
+      }
+
+      目标地点!.移除已捕获母畜(目标);
+      游戏总控!.母畜管理.从劝诱获取母畜(目标);
+
+      return {
+        成功: true,
+        类型: '潜入劝诱',
+        执行人: 执行母畜,
+        目标: 目标,
+        已获取母畜: [目标],
+        信息: `${执行母畜.获取属性('姓名')} 潜入 ${目标.获取属性('姓名')}，成功劝诱了 ${目标.获取属性('姓名')}`,
+      };
+    },
+  });
+  任务系统.注册任务('生育哥布林冠军', {
+    名称: '生育哥布林冠军',
+    描述: '母畜生育哥布林冠军',
+    目标实体类型: null,
+    执行人实体类型: '母畜实体',
+    前置条件: {
+      类型: 执行人 => 执行人.实体类型 === '母畜',
+      臣服度: 执行人 => (执行人 as 母畜实体).获取属性('剩余生育力') >= (执行人 as 母畜实体).生育冠军消耗(),
+    },
+    行动力占用: 执行人 => ((执行人 as 母畜实体).获取属性('臣服度') >= 25 ? 1 : 2),
+    执行效果: (执行人, _无, 游戏总控) => {
+      const 母畜 = 执行人 as 母畜实体;
+
+      // 调用 工厂管理器.从母畜生育哥布林冠军
+      const 冠军 = 工厂管理器实例.从母畜生育哥布林冠军(母畜, {});
+      const 初始淫乱度 = 母畜.获取属性('淫乱度');
+
+      if (冠军) {
+        母畜.修改属性('淫乱度', 6);
+        // 冠军加入玩家阵营逻辑
+        游戏总控!.冠军管理.从生育获取冠军(冠军);
+        母畜.消耗生育力(冠军)
+
+        return {
+          成功: true,
+          类型: '生育哥布林冠军',
+          执行人: 母畜,
+          目标: null,
+          变化: {
+            淫乱度: [初始淫乱度, 母畜.获取属性('淫乱度')],
+          },
+          已获取冠军: [冠军],
+          信息: `${母畜.获取属性('姓名')} 生育了一个哥布林冠军: ${冠军.获取属性('姓名')}`,
+        };
+      }
+
+      return {
+        成功: false,
+        类型: '生育哥布林冠军',
+        执行人: 母畜,
+        目标: null,
+      };
+    },
+  });
+
+  任务系统.注册任务('生育喽啰', {
+    名称: '生育喽啰',
+    描述: '母畜生育喽啰',
+    执行人实体类型: '母畜实体',
+    目标实体类型: null,
+    前置条件: {
+      类型: 执行人 => 执行人.实体类型 === '母畜',
+      生育力: 执行人 => (执行人 as 母畜实体).获取属性('剩余生育力') >= (执行人 as 母畜实体).生育喽啰消耗(),
+    },    
+    行动力占用: 执行人 => ((执行人 as 母畜实体).获取属性('臣服度') >= 25 ? 0 : 1),
+    执行效果: (执行人, _无, 游戏总控) => {
+      const 母畜 = 执行人 as 母畜实体;
+
+      const 初始喽啰数量 = 游戏总控!.喽啰池管理.获取喽啰总数();
+      const 初始淫乱度 = 母畜.获取属性('淫乱度');
+      const 价值 = 母畜.获取属性('剩余生育力');
+      const 数量 = min(10, floor(价值 / 母畜.生育喽啰消耗()));
+
+      母畜.消耗生育力( 数量 )
+      母畜.修改属性('淫乱度', 6);
+
+      // 增加喽啰池
+      const 目标喽啰池 = 游戏总控!.喽啰池管理.获取无将领喽啰池();
+      目标喽啰池.增加喽啰(数量, '未武装');
+
+      return {
+        成功: true,
+        类型: '生育喽啰',
+        执行人: 母畜,
+        目标: null,
+        变化: {
+          喽啰数量: [初始喽啰数量, 游戏总控!.喽啰池管理.获取喽啰总数()],
+          淫乱度: [初始淫乱度, 母畜.获取属性('淫乱度')],
+        },
+        信息: `${母畜.获取属性('姓名')} 生育了 ${数量} 个哥布林喽啰`,
+      };
+    },
+  });
+
+  任务系统.注册任务('提振士气', {
+    名称: '提振士气',
+    描述: '母畜提振全军士气，魅力越高，效果越好',
+    执行人实体类型: '母畜实体',
+    目标实体类型: null,
+    前置条件: {
+      类型: 执行人 => 执行人.实体类型 === '母畜',
+      臣服度: 执行人 => (执行人 as 母畜实体).获取属性('臣服度') >= 75,
+    },   
+    行动力占用: _执行人 => 1,
+    执行效果: (执行人, _无, 游戏总控) => {
+      const 母畜 = 执行人 as 母畜实体;
+
+      const 初始士气 = 游戏总控!.资源管理.获取士气();
+      const 初始淫乱度 = 母畜.获取属性('淫乱度');
+      const 执行效率 = 母畜.获取效率('魅力');
+      const 增量 = Math.floor(执行效率 * 8 + 10);
+      const 当前士气 = 游戏总控!.资源管理.修改士气(增量);
+      母畜.修改属性('淫乱度', 10);
+
+      return {
+        成功: true,
+        类型: '提振士气',
+        执行人: 母畜,
+        目标: null,
+        变化: {
+          士气: [初始士气, 当前士气],
+          淫乱度: [初始淫乱度, 母畜.获取属性('淫乱度')],
+        },
+        信息: `将 ${母畜.获取属性('姓名')} 提供给哥布林小弟们使用，士气提升了 ${增量}`,
+      };
+    },
+  });
+
+  任务系统.注册任务('泌乳', {
+    名称: '泌乳',
+    描述: '母畜泌乳，淫乱度越高，产量越高',
+    执行人实体类型: '母畜实体',
+    目标实体类型: null,
+    前置条件: {
+      类型: 执行人 => 执行人.实体类型 === '母畜',
+      淫乱度: 执行人 => (执行人 as 母畜实体).获取属性('淫乱度') >= 25,
+    },   
+    行动力占用: 执行人 => ((执行人 as 母畜实体).获取属性('臣服度') >= 50 ? 0 : 1),
+    执行效果: (执行人, _无, 游戏总控) => {
+      const 母畜 = 执行人 as 母畜实体;
+
+      const 初始淫乱度 = 母畜.获取属性('淫乱度');
+      const 初始催淫母乳数量 = 游戏总控!.资源管理.获取催淫母乳数量();
+
+      母畜.修改属性('淫乱度', 3);
+
+      const 执行效率 = 母畜.获取效率('淫乱度');
+      const 产出 = floor(执行效率 * 8 + 5);
+      const 当前催淫母乳数量 = 游戏总控!.资源管理.修改催淫母乳数量(产出);
+
+      return {
+        成功: true,
+        类型: '泌乳',
+        执行人: 母畜,
+        目标: null,
+        变化: {
+          催淫母乳数量: [初始催淫母乳数量, 当前催淫母乳数量],
+          淫乱度: [初始淫乱度, 母畜.获取属性('淫乱度')],
+        },
+        信息: `${母畜.获取属性('姓名')} 产出 ${产出} 份催淫母乳`,
+      };
+    },
+  });
+
+  任务系统.注册任务('献祭', {
+    名称: '献祭',
+    描述: '献祭母畜，根据生育力和魅力获取 5 到 25 点魔力',
+    执行人实体类型: '母畜实体',
+    目标实体类型: null,
+    行动力占用: _执行人 => 0,
+    前置条件: {
+      类型: 执行人 => 执行人.实体类型 === '母畜',
+      淫乱度: 执行人 => (执行人 as 母畜实体).获取属性('淫乱度') >= 75,
+    },   
+    执行效果: (执行人, _无, 游戏总控) => {
+      const 母畜 = 执行人 as 母畜实体;
+
+      const 价值 = 母畜.获取属性('总生育力');
+      const 执行效率 = 母畜.获取效率('魅力');
+      const 魔力增量 = floor((价值 * 执行效率 + 50) / 50);
+
+      const 领主 = 游戏总控!.领主管理.获取领主();
+      const 初始魔力 = 领主.获取属性('魔力');
+      领主.获得魔力(魔力增量);
+
+      游戏总控!.母畜管理.移除母畜(母畜);
+      母畜.销毁();
+
+      return {
+        成功: true,
+        类型: '献祭',
+        执行人: 母畜,
+        目标: null,
+        变化: { 魔力: [初始魔力, 领主.获取属性('魔力')] },
+        信息: `${母畜.获取属性('姓名')} 被献祭，获得 ${魔力增量} 点魔力`,
+      };
+    },
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // 黑市商品配置
+  // ═══════════════════════════════════════════════════════════════
+
+  const 武装升级效果 =
+    (数量: number, 等级: 武装等级) =>
+    (游戏总控: 游戏总控接口): 商品执行结果 => {
+      // 优先列表定义
+      const 结果 = 游戏总控.喽啰池管理.武装升级(数量, 等级)
+      return {
+        成功: 结果,
+        类型: '武装升级',
+        目标: null,
+      };
+    };
+
+  黑市系统.注册商品('破旧兵刃', {
+    名称: '破旧兵刃',
+    价格: 1,
+    类型: '装备',
+    目标类型: null,
+    描述: '勉强能用的武器和护甲，聊胜于无，可以武装10名喽啰',
+    每周限购: Infinity,
+    执行效果: (购买数量, 目标喽啰池, 游戏总控) =>
+      武装升级效果(10 * 购买数量, '低级武装')(游戏总控),
+  });
+
+  黑市系统.注册商品('标准铁剑', {
+    名称: '标准铁剑',
+    价格: 1,
+    类型: '装备',
+    目标类型: null,
+    描述: '正规军队的标准装备，可靠耐用，可以武装4名喽啰',
+    每周限购: Infinity,
+    执行效果: (购买数量, 目标喽啰池, 游戏总控) =>
+      武装升级效果(4 * 购买数量, '中级武装')(游戏总控),
+  });
+
+  黑市系统.注册商品('骑士武装', {
+    名称: '骑士武装',
+    价格: 1,
+    类型: '装备',
+    目标类型: null,
+    描述: '通过特殊渠道走私的骑士装备，品质上乘，可以武装1名喽啰',
+    每周限购: Infinity,
+    执行效果: (购买数量, 目标喽啰池, 游戏总控) =>
+      武装升级效果(1 * 购买数量, '高级武装')(游戏总控),
+  });
+
+  黑市系统.注册商品('附魔装备', {
+    名称: '附魔装备',
+    价格: 4,
+    类型: '装备',
+    目标类型: null,
+    描述: '非常罕见的附魔装备，极大提升喽啰战斗力，可以武装1名喽啰',
+    每周限购: Infinity,
+    执行效果: (购买数量, 目标喽啰池, 游戏总控) =>
+      武装升级效果(1 * 购买数量, '精英武装')( 游戏总控),
+  });
+
+  黑市系统.注册商品('祝福水晶', {
+    名称: '祝福水晶',
+    价格: 50,
+    类型: '消耗品',
+    目标类型: '母畜实体',
+    描述: '可以增加母畜50点的生育质量，对淫乱的母畜效果不好',
+    每周限购: 1,
+    执行效果: (购买数量, 目标母畜, _游戏总控) => {
+      const 母畜 = 目标母畜 as 母畜实体;
+
+      const 淫乱度惩罚 = 母畜.获取效率('淫乱度惩罚');
+      const 增量 = (购买数量 * 50) * 淫乱度惩罚;
+      const 初始总生育力 = 母畜.获取属性('总生育力');
+      const 初始剩余生育力 = 母畜.获取属性('剩余生育力');
+      母畜.修改属性('总生育力', 增量);
+      母畜.修改属性('剩余生育力', 增量);
+
+      return {
+        成功: true,
+        类型: '祝福水晶',
+        目标: 母畜,
+        变化: {
+          总生育力: [初始总生育力, 母畜.获取属性('总生育力')],
+          剩余生育力: [初始剩余生育力, 母畜.获取属性('剩余生育力')],
+        },
+        信息: `对 ${母畜.获取属性('姓名')} 使用了祝福水晶，生育力提高了 ${增量}`,
+      };
+    },
+  });
+
+  黑市系统.注册商品('净化水晶', {
+    名称: '净化水晶',
+    描述: '降低 10 点淫乱度',
+    价格: 25,
+    类型: '消耗品',
+    目标类型: '母畜实体',
+    每周限购: 5,
+    执行效果: (购买数量, 目标母畜, _游戏总控) => {
+      const 母畜 = 目标母畜 as 母畜实体;
+
+      const 初始淫乱 = 母畜.获取属性('淫乱度');
+      const 新值 = 母畜.修改属性('淫乱度', -10 * 购买数量);
+
+      return {
+        成功: true,
+        类型: '净化水晶',
+        目标: 母畜,
+        变化: { 淫乱度: [初始淫乱, 新值] },
+        信息: `对 ${母畜.获取属性('姓名')} 使用了净化水晶，淫乱度降低了 ${10 * 购买数量}`,
+      };
+    },
+  });
+
+  黑市系统.注册商品('魔力水晶', {
+    名称: '魔力水晶',
+    描述: '回复 3 点魔力',
+    价格: 15,
+    类型: '消耗品',
+    目标类型: '领主实体',
+    每周限购: 1,
+    执行效果: (购买数量, _无, 游戏总控) => {
+      const 领主 = 游戏总控.领主管理.获取领主();
+      const 初始魔力 = 领主.获取属性('魔力');
+      const 结果 = 领主.获得魔力(3 * 购买数量);
+
+      return {
+        成功: true,
+        类型: '魔力水晶',
+        目标: null,
+        变化: { 领主魔力: [初始魔力, 结果.当前] },
+        信息: `使用了魔力水晶，魔力恢复了 ${3 * 购买数量}`,
+      };
+    },
+  });
+
+  // ═══════════════════════════════════════════════════════════════
+  // 法术配置
+  // ═══════════════════════════════════════════════════════════════
+
+  法术系统.注册法术('魔眼侦察', {
+    名称: '魔眼侦察',
+    价格: 1,
+    目标类型: '可袭击地点实体',
+    描述: '对目标地点进行侦查',
+    法术倍率上限: 3,
+    执行效果: (法术倍率, 目标地点, _游戏总控) => {
+      const 地点 = 目标地点 as 可袭击地点实体;
+
+      const 初始侦察进度 = 地点.获取侦察进度();
+      const 新值 = 地点.增加侦察进度(20 * 法术倍率);
+
+      return {
+        成功: true,
+        类型: '魔眼侦察',
+        目标: 地点,
+        变化: { 侦察进度: [初始侦察进度, 新值] },
+        信息: `对 ${地点.地点名称} 释放了侦察法术，侦察进度增加了 ${20 * 法术倍率}`,
+
+      };
+    },
+  });
+
+  法术系统.注册法术('意志粉碎', {
+    名称: '意志粉碎',
+    价格: 1,
+    目标类型: '母畜实体',
+    描述: '获取 10 点臣服度',
+    法术倍率上限: 3,
+    执行效果: (法术倍率, 目标母畜, _游戏总控) => {
+      const 母畜 = 目标母畜 as 母畜实体;
+
+      const 初始臣服 = 母畜.获取属性('臣服度');
+      const 新值 = 母畜.修改属性('臣服度', 10 * 法术倍率);
+
+      return {
+        成功: true,
+        类型: '意志粉碎',
+        目标: 母畜,
+        变化: { 臣服度: [初始臣服, 新值] },
+        信息: `对 ${母畜.获取属性('姓名')} 使用了意志粉碎法术，臣服度增加了 ${10 * 法术倍率}`,
+      };
+    },
+  });
+
+  法术系统.注册法术('孕力回复', {
+    名称: '孕力回复',
+    目标类型: '母畜实体',
+    价格: 10,
+    描述: '回复 50 点生育力',
+    法术倍率上限: 3,
+    执行效果: (法术倍率, 目标母畜, _游戏总控) => {
+      const 母畜 = 目标母畜 as 母畜实体;
+
+      const 初始剩余生育力 = 母畜.获取属性('剩余生育力');
+      const 新值 = 母畜.修改属性('剩余生育力', 50 * 法术倍率);
+
+      return {
+        成功: true,
+        类型: '孕力回复',
+        目标: 母畜,
+        变化: { 剩余生育力: [初始剩余生育力, 新值] },
+        信息: `对 ${母畜.获取属性('姓名')} 使用了孕力回复法术，生育力恢复了 ${50 * 法术倍率}`,
+      };
+    },
+  });
+
+  法术系统.注册法术('士气鼓舞', {
+    名称: '士气鼓舞',
+    价格: 5,
+    目标类型: null,
+    描述: '提高30点士气',
+    法术倍率上限: 3,
+    执行效果: (法术倍率, _无, 游戏总控) => {
+      const 初始士气 = 游戏总控.资源管理.获取士气();
+      const 新值 = 游戏总控.资源管理.修改士气(30 * 法术倍率);
+      return {
+        成功: true,
+        类型: '士气鼓舞',
+        目标: null,
+        变化: { 士气: [初始士气, 新值] },
+        信息: `使用了士气鼓舞法术，士气恢复了 ${30 * 法术倍率}`,
+      };
+    },
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// data/trait.ts
+// 母畜特性标签类
+// ═══════════════════════════════════════════════════════════════
+
+
+
+// ═══════════════════════════════════════════════════════════════
+// game/bootstrap.ts
+// 游戏主入口 - 初始化与启动
+// ═══════════════════════════════════════════════════════════════
+
+import { 工厂管理器 } from '../core/factories';
+import { 游戏总控, 创建游戏实例 } from './controller';
+import { 初始化任务法术市场 } from '../data/rules';
+import {
+    运行时配置,
+    游戏初始配置,
+    初始地点配置,
+    初始母畜配置,
+} from '../data/config';
+
+// ═══════════════════════════════════════════════════════════════
+// 游戏引导器
+// ═══════════════════════════════════════════════════════════════
+
+class 游戏引导器 {
+    private 游戏实例: 游戏总控 | null = null;
+    private 已初始化: boolean = false;
+
+    /**
+     * 初始化并启动新游戏
+     */
+    启动新游戏(): 游戏总控 {
+        // 1. 创建工厂管理器（注入运行时配置）
+        const 工厂 = new 工厂管理器(运行时配置);
+
+        // 2. 创建游戏总控实例
+        this.游戏实例 = 创建游戏实例(运行时配置, {
+            领主姓名: 游戏初始配置.领主姓名,
+            初始魔力: 游戏初始配置.初始魔力,
+            初始士气: 游戏初始配置.初始士气,
+            初始催淫母乳: 游戏初始配置.初始催淫母乳,
+            初始喽啰数: 游戏初始配置.初始喽啰数,
+        });
+
+        // 3. 初始化规则系统（任务、法术、黑市商品注册）
+
+        初始化任务法术市场(
+            工厂,
+            this.游戏实例.系统管理.获取任务管理器(),
+            this.游戏实例.系统管理.获取黑市管理器(),
+            this.游戏实例.系统管理.获取法术管理器(),
+        );
+        // 5. 生成初始可袭击地点
+        this.生成初始地点(工厂);
+        this.生成初始实体(工厂);
+
+        this.已初始化 = true;
+        return this.游戏实例;
+    }
+
+    /**
+     * 生成初始地点
+     */
+    private 生成初始地点(工厂: 工厂管理器): void {
+        if (!this.游戏实例) return;
+
+        const { 生成数量, 可用类型 } = 初始地点配置;
+
+        for (let i = 0; i < 生成数量; i++) {
+            const 类型 = 可用类型[Math.floor(Math.random() * 可用类型.length)]!;
+            const 地点 = 工厂.创建可袭击地点(类型, {});
+            this.游戏实例.地点管理.添加地点(地点);
+        }
+    }
+
+    private 生成初始实体(工厂: 工厂管理器): void{
+        if (!this.游戏实例) return;
+        for (let i = 0; i < 游戏初始配置.初始母畜数; i++) {
+            const 母畜 = 工厂.创建母畜(初始母畜配置[i]!);
+            this.游戏实例.母畜管理.添加母畜(母畜);
+
+        }
+        for (let i = 0; i < 游戏初始配置.初始冠军数; i++) {
+            const 随机母畜 = this.游戏实例.系统管理.获取实体管理器().获取所有母畜()[Math.floor(Math.random() * 游戏初始配置.初始母畜数)]!;
+            if (!随机母畜) continue;
+            const 冠军 = 工厂.从母畜生育哥布林冠军(随机母畜, {});
+            this.游戏实例.冠军管理.添加冠军(冠军);
+        }
+
+    }
+
+    /**
+     * 获取当前游戏实例
+     */
+    获取游戏(): 游戏总控 | null {
+        return this.游戏实例;
+    }
+
+    /**
+     * 游戏是否已初始化
+     */
+    是否已初始化(): boolean {
+        return this.已初始化;
+    }
+
+    /**
+     * 重置游戏（用于重新开始）
+     */
+    重置(): void {
+        this.游戏实例 = null;
+        this.已初始化 = false;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 单例导出
+// ═══════════════════════════════════════════════════════════════
+
+export const 游戏引导 = new 游戏引导器();
+
+// 便捷函数
+export function 启动游戏(): 游戏总控 {
+    return 游戏引导.启动新游戏();
+}
+
+export function 获取当前游戏(): 游戏总控 | null {
+    return 游戏引导.获取游戏();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// game/controller.ts
+// 游戏总控 - 资源管理器、实体管理器、游戏总控中心
+// ═══════════════════════════════════════════════════════════════
+
+import { 冠军实体, 可袭击地点实体, 喽啰池实体, 母畜实体, 领主实体 } from '../core/entities';
+
+import { 工厂管理器 } from '../core/factories';
+
+import type { 任务配置, 可执行实体, 可目标实体, 回合结算摘要, 奴隶购买结果, 已发布任务, 法术执行结果, 游戏总控接口, 购买结果 } from '../types/systems';
+
+import type { 运行时实体配置, 领主创建配置 } from '../types/index';
+
+import type { 奴隶刷新配置, 实体类型, 武装等级, 资源状态 } from '@/types';
+
+import type { 游戏存档数据 } from '../core/persistence';
+import { 存档管理器 } from '../core/persistence';
+
+import { 任务管理器, 回合管理器, 实体管理器, 战斗管理器, 法术管理器, 资源管理器, 黑市管理器 } from '../core/managers';
+import type { 游戏初始化配置 } from '@/types/controller';
+import type { n } from 'vite/dist/node/chunks/moduleRunnerTransport';
+
+// ═══════════════════════════════════════════════════════════════
+// 游戏总控
+// ═══════════════════════════════════════════════════════════════
+
+class 游戏总控 implements 游戏总控接口 {
+  private 资源管理器实例: 资源管理器;
+  private 实体管理器实例: 实体管理器;
+  private 工厂管理器实例: 工厂管理器;
+  private 战斗管理器实例: 战斗管理器;
+  private 任务管理器实例: 任务管理器;
+  private 法术管理器实例: 法术管理器;
+  private 黑市管理器实例: 黑市管理器;
+  private 回合管理器实例: 回合管理器;
+  private 存档管理器实例: 存档管理器;
+
+  // 接口实现对象
+  readonly 地点管理: {
+    获取地点: (地点ID: string) => 可袭击地点实体 | null;
+    添加地点: (地点: 可袭击地点实体) => void;
+    获取所有地点: () => 可袭击地点实体[];
+  };
+
+  readonly 母畜管理: {
+    从劝诱获取母畜: (母畜: 母畜实体) => void;
+    移除母畜: (母畜: 母畜实体) => void;
+    添加母畜: (母畜: 母畜实体) => void;
+    获取母畜: (母畜ID: string) => 母畜实体 | null;
+    获取所有母畜: () => 母畜实体[];
+  };
+
+  readonly 冠军管理: {
+    从生育获取冠军: (冠军: 冠军实体) => void;
+    添加冠军: (冠军: 冠军实体) => void;
+    获取冠军: (冠军ID: string) => 冠军实体 | null;
+    获取所有冠军: () => 冠军实体[];
+  };
+
+  readonly 喽啰池管理: {
+    获取喽啰总数: () => number;
+    获取无将领喽啰池: () => 喽啰池实体;
+    可升级数量: (目标等级: 武装等级) => number;
+    武装升级: (数量: number, 武装等级: 武装等级) => boolean;
+    自动分配: () => boolean;
+    清空所有将领喽啰池: () => void;
+    清空将领喽啰池: (冠军输入:  冠军实体 | string) => void;
+    快速填充到上限: (冠军输入:  冠军实体 | string) => void;
+  };
+
+  readonly 资源管理: {
+    获取士气: () => number;
+    获取最大士气: () => number;
+    修改士气: (增量: number) => number;
+    获取催淫母乳数量: () => number;
+    修改催淫母乳数量: (增量: number) => number;
+    使用法术: (法术名: string,倍率: number, 目标?: 可目标实体) => { 成功: boolean; 原因?: string; 结果?: 法术执行结果 };
+    购买商品: (商品名: string, 购买数量: number, 目标?: 可目标实体 | null) => 购买结果;
+    购买奴隶: (商品ID: string) => 奴隶购买结果;
+
+  };
+
+  readonly 任务管理: {
+    获取所有任务名: () => string[];
+    获取任务配置: (任务名: string) => 任务配置 | undefined
+    发布任务: (任务名: string, 执行人: 可执行实体, 目标?: 可目标实体) => { 成功: boolean; 任务ID?: string; 原因?: string };
+    获取已发布任务列表: () => 已发布任务[];
+    是否被占用: (ID: string) => boolean;
+    取消任务: (任务ID: string) => { 成功: boolean; 原因?: string };
+    获取剩余行动力: () => number;
+    获取最大行动力: () => number;
+  };
+
+  readonly 实体管理: {
+    获取实体: (实体ID: string) => 实体类型 | null;
+  };
+
+  readonly 领主管理: {
+    创建领主: (配置: 领主创建配置) => 领主实体;
+    获取领主: () => 领主实体;
+    设置领主: (领主: 领主实体) => void;
+    修改魔力: (增量: number) => number;
+  };
+
+  readonly 系统管理: {
+    获取资源管理器: () => 资源管理器;
+    获取实体管理器: () => 实体管理器;
+    获取工厂管理器: () => 工厂管理器;
+    获取战斗管理器: () => 战斗管理器;
+    获取任务管理器: () => 任务管理器;
+    获取法术管理器: () => 法术管理器;
+    获取黑市管理器: () => 黑市管理器;
+    获取回合管理器: () => 回合管理器;
+  };
+
+  readonly 战斗管理: {
+    选择目标: (地点输入: 可袭击地点实体 | string) => { 成功: boolean; 原因?: string };
+    获取选定目标: () => 可袭击地点实体 | null;
+    取消目标选择: () => void;
+    执行战斗: () => any;
+    添加出战将领: (将领ID: string) => { 成功: boolean; 原因?: string };
+    移除出战将领: (将领ID: string) => { 成功: boolean; 原因?: string };
+    确认战斗: () => { 成功: boolean; 原因?: string };
+    是否战斗: () => boolean;
+    获取战斗预览: () => {
+      可执行: boolean;
+      原因?: string;
+      目标?: {
+        名称: string;
+        战斗力: number;
+      };
+      我方?: {
+        总战斗力: number;
+        将领数量: number;
+        行动力消耗: number;
+        突袭模式: boolean;
+      };
+      胜率预估?: number;
+    };
+
+  }
+
+  readonly 回合管理: {
+    获取当前回合: () => number;
+    结束回合: () => 回合结算摘要;
+    获取游戏状态: () => any;
+  };
+
+  readonly 存档管理: {
+    写入变量: ()=> void;
+    读取变量: ()=> boolean;
+    保存游戏: (游戏总控: 游戏总控) => {成功: boolean; 原因?: string | undefined;};
+    加载存档: () => {成功: boolean; 原因?: string | undefined;};
+    获取存档管理器: () => 存档管理器;
+    获取存档数据: () => 游戏存档数据 | null;
+    加载存档数据: (存档: 游戏存档数据) => { 成功: boolean; 原因?: string };
+  };
+
+  constructor(配置: { 运行时配置: 运行时实体配置; 初始资源?: 游戏初始化配置 }) {
+    this.工厂管理器实例 = new 工厂管理器(配置.运行时配置);
+    this.资源管理器实例 = new 资源管理器(配置.初始资源);
+    this.实体管理器实例 = new 实体管理器();
+    this.任务管理器实例 = new 任务管理器();
+    this.法术管理器实例 = new 法术管理器();
+    this.黑市管理器实例 = new 黑市管理器(配置.运行时配置);
+    this.回合管理器实例 = new 回合管理器();
+    this.存档管理器实例 = new 存档管理器(this.工厂管理器实例);
+    this.战斗管理器实例 = new 战斗管理器(this.实体管理器实例, this.任务管理器实例);
+    this.黑市管理器实例.设置奴隶刷新配置(配置.运行时配置.黑市奴隶刷新配置!);
+    this.初始化()
+
+
+    // ─── 绑定接口实现 ───
+
+    this.地点管理 = {
+      获取地点: (地点ID: string) => this.实体管理器实例.获取地点(地点ID),
+      添加地点: (地点: 可袭击地点实体) => this.实体管理器实例.添加地点(地点),
+      获取所有地点: () => this.实体管理器实例.获取所有地点(),
+    };
+
+    this.母畜管理 = {
+      从劝诱获取母畜: (母畜: 母畜实体) => {
+        母畜.设置属性('来源', '劝诱');
+        this.实体管理器实例.添加母畜(母畜);
+      },
+      移除母畜: (母畜: 母畜实体) => {
+        this.实体管理器实例.移除母畜(母畜);
+      },
+      添加母畜: (母畜: 母畜实体) => this.实体管理器实例.添加母畜(母畜),
+      获取母畜: (母畜ID: string) => this.实体管理器实例.获取母畜(母畜ID),
+      获取所有母畜: () => this.实体管理器实例.获取所有母畜(),
+    };
+
+    this.冠军管理 = {
+      从生育获取冠军: (冠军: 冠军实体) => {
+        this.实体管理器实例.添加冠军(冠军);
+      },
+      添加冠军: (冠军: 冠军实体) => this.实体管理器实例.添加冠军(冠军),
+      获取冠军: (冠军ID: string) => this.实体管理器实例.获取冠军(冠军ID),
+      获取所有冠军: () => this.实体管理器实例.获取所有冠军(),
+    };
+
+    this.喽啰池管理 = {
+      获取喽啰总数: () => this.实体管理器实例.获取喽啰总数(),
+      获取无将领喽啰池: () => this.实体管理器实例.获取无将领喽啰池(),
+      武装升级: (数量: number, 目标等级: 武装等级) => {
+        const 无将领池 = this.实体管理器实例.获取无将领喽啰池();
+
+        // 武装等级优先级列表（从低到高）
+        const 等级优先级: 武装等级[] = ['未武装', '低级武装', '中级武装', '高级武装', '精英武装'];
+        const 目标索引 = 等级优先级.indexOf(目标等级);
+
+        if (目标索引 <= 0) {
+          return false; // 无法升级到未武装或无效等级
+        }
+
+        let 剩余需求 = 数量;
+
+        // 从低等级开始寻找可升级的喽啰
+        for (let i = 0; i < 目标索引 && 剩余需求 > 0; i++) {
+          const 来源等级 = 等级优先级[i]!;
+          const 来源数量 = 无将领池.获取分组数量(来源等级);
+
+          if (来源数量 <= 0) continue;
+
+          const 可升级数量 = Math.min(来源数量, 剩余需求);
+
+          // 执行升级
+          无将领池.减少喽啰(可升级数量, 来源等级);
+          无将领池.增加喽啰(可升级数量, 目标等级);
+
+          剩余需求 -= 可升级数量;
+        }
+
+        return 剩余需求 < 数量;
+      },
+      可升级数量: (目标等级: 武装等级) => {
+        const 无将领池 = this.实体管理器实例.获取无将领喽啰池();
+
+        // 武装等级优先级列表（从低到高）
+        const 等级优先级: 武装等级[] = ['未武装', '低级武装', '中级武装', '高级武装', '精英武装'];
+        const 目标索引 = 等级优先级.indexOf(目标等级);
+
+        if (目标索引 <= 0) {
+          return 0;
+        }
+
+        let 可升级数量 = 0;
+
+        for (let i = 0; i < 目标索引; i++) {
+          const 等级 = 等级优先级[i]!;
+          const 数量 = 无将领池.获取分组数量(等级);
+
+          if (数量 <= 0) continue;
+
+          可升级数量 += 数量;
+        }
+        return 可升级数量;
+      },
+      自动分配: () => {
+        const 将领列表 = this.实体管理器实例.获取所有冠军().sort((a, b) => b.获取属性('智力') - a.获取属性('智力'));
+        if (将领列表.length === 0) {
+          return false;
+        }
+        将领列表.forEach(冠军 => {
+          this.实体管理器实例.清空将领喽啰池(冠军);
+        });
+        将领列表.forEach(冠军 => {
+          this.实体管理器实例.快速填充到上限(冠军);
+        });
+        return true;
+      },
+      清空所有将领喽啰池: () => {
+        const 将领列表 = this.实体管理器实例.获取所有冠军();
+        将领列表.forEach(将领 => {
+          this.实体管理器实例.清空将领喽啰池(将领);
+        });
+      },
+      清空将领喽啰池: (冠军输入:  冠军实体 | string) => this.实体管理器实例.清空将领喽啰池(冠军输入),
+      快速填充到上限: (冠军输入:  冠军实体 | string) => this.实体管理器实例.快速填充到上限(冠军输入),
+    };
+
+    this.资源管理 = {
+      获取士气: () => this.资源管理器实例.获取士气(),
+      获取最大士气: () => this.资源管理器实例.获取最大士气(),
+      修改士气: (增量: number) => this.资源管理器实例.修改士气(增量),
+      获取催淫母乳数量: () => this.资源管理器实例.获取催淫母乳数量(),
+      修改催淫母乳数量: (增量: number) => this.资源管理器实例.修改催淫母乳数量(增量),
+      使用法术: (法术名: string,倍率: number,目标: 可目标实体 = null) => this.法术管理器实例.使用法术(法术名, 倍率, 目标),
+      购买商品: (商品名: string, 购买数量: number, 目标: 可目标实体 | null = null) => this.黑市管理器实例.购买商品(商品名, 购买数量, 目标),
+      购买奴隶: (商品ID: string) => this.黑市管理器实例.购买奴隶(商品ID),
+    };
+
+    this.任务管理 = {
+      获取所有任务名: () => this.任务管理器实例.获取所有任务名(),
+      获取任务配置: (任务名: string) => this.任务管理器实例.获取任务配置(任务名),
+      发布任务: (任务名: string, 执行人: 可执行实体, 目标?: 可目标实体) => this.任务管理器实例.发布任务(任务名, 执行人, 目标),
+      获取已发布任务列表: () => this.任务管理器实例.获取已发布任务列表(),
+      是否被占用: (ID: string) => this.任务管理器实例.是否被占用(ID),
+      取消任务: (任务ID: string) => this.任务管理器实例.取消任务(任务ID),
+      获取剩余行动力: () => this.任务管理器实例.获取剩余行动力(),
+      获取最大行动力: () => this.任务管理器实例.获取总行动力(),
+    }
+
+    this.实体管理 = {
+      获取实体: (实体ID: string) => this.实体管理器实例.获取实体(实体ID),
+    };
+
+    this.领主管理 = {
+      创建领主: (配置: 领主创建配置) => {
+        const 领主 = this.工厂管理器实例.创建领主(配置);
+        this.实体管理器实例.设置领主(领主);
+        return 领主;
+      },
+      获取领主: () => {
+        const 领主 = this.实体管理器实例.获取领主();
+        if (!领主) {
+          throw new Error('领主未初始化');
+        }
+        return 领主;
+      },
+      设置领主: (领主: 领主实体) => this.实体管理器实例.设置领主(领主),
+      修改魔力: (数量: number) => this.实体管理器实例.获取领主()?.修改属性('魔力', 数量)!,
+    };
+
+    this.系统管理 = {
+      获取资源管理器: () => this.资源管理器实例,
+      获取实体管理器: () => this.实体管理器实例,
+      获取工厂管理器: () => this.工厂管理器实例,
+      获取战斗管理器: () => this.战斗管理器实例,
+      获取任务管理器: () => this.任务管理器实例,
+      获取法术管理器: () => this.法术管理器实例,
+      获取黑市管理器: () => this.黑市管理器实例,
+      获取回合管理器: () => this.回合管理器实例,
+    };
+
+    this.战斗管理 = {
+      执行战斗: () => {
+        const 结果 = this.战斗管理器实例.执行战斗();
+
+        // 处理战斗结果
+        if (结果.成功 && 结果.胜利 && 结果.俘获母畜) {
+          for (const 母畜ID of 结果.俘获母畜) {
+            // 母畜已经在战斗管理器中被从地点移除
+            // 需要从地点实体获取并添加到玩家
+            // 这里假设母畜实体已经被正确处理
+          }
+        }
+
+        return 结果;
+      },
+      获取选定目标: () => this.战斗管理器实例.获取选定目标(),
+      取消目标选择: () => this.战斗管理器实例.取消目标选择(),
+      选择目标: (地点输入: 可袭击地点实体 | string) => this.战斗管理器实例.选择目标(地点输入),
+      添加出战将领: (冠军输入: 冠军实体 | string) => this.战斗管理器实例.添加出战将领(冠军输入),
+      移除出战将领: (冠军输入: 冠军实体 | string) => this.战斗管理器实例.移除出战将领(冠军输入),
+      确认战斗: () => this.战斗管理器实例.确认战斗(),
+      获取战斗预览: () => this.战斗管理器实例.获取战斗预览(),
+      是否战斗 : () => this.战斗管理器实例.是否战斗,
+    };
+
+    this.回合管理 = {
+      获取当前回合: () => this.回合管理器实例.获取当前回合(),
+      结束回合: () => {
+        // 资源结算
+        this.资源管理器实例.回合结算();
+        const 回合结算摘要 = this.回合管理器实例.结束回合();
+
+        // 系统结算
+        return 回合结算摘要;
+      },
+      获取游戏状态: () => {
+        return {
+          回合数: this.回合管理器实例.获取当前回合(),
+          资源状态: this.资源管理器实例.获取资源状态(),
+          实体统计: this.实体管理器实例.获取实体统计(),
+          领主魔力: this.实体管理器实例.获取领主()?.获取属性('魔力') ?? 0,
+        };
+      }
+    };
+
+    this.存档管理 = {
+      保存游戏: (游戏总控: 游戏总控) => this.存档管理器实例.保存游戏(游戏总控,1),
+      加载存档: () => this.存档管理器实例.读取存档(1),
+      获取存档管理器: () => this.存档管理器实例,
+      获取存档数据: () => this.存档管理器实例.获取存档数据(this),
+      加载存档数据: (存档: 游戏存档数据) => {
+        const 成功 = this.存档管理器实例.加载存档数据(存档, this);
+        return { 成功 };
+      }
+    };
+  }
+
+  private 初始化(): void {
+    this.任务管理器实例.设置游戏总控(this);
+    this.法术管理器实例.设置游戏总控(this);
+    this.黑市管理器实例.设置游戏总控(this);
+    this.黑市管理器实例.设置工厂管理器(this.工厂管理器实例);
+    this.回合管理器实例.初始化(
+      this.任务管理器实例,
+      this.法术管理器实例,
+      this.黑市管理器实例,
+      this.战斗管理器实例,
+      this.资源管理器实例,
+    );
+  }
+
+  // ─── 游戏状态 ───
+
+  // 获取游戏状态() {
+  //   return {
+  //     回合数: this.回合管理器实例.获取当前回合(),
+  //     资源状态: this.资源管理器实例.获取资源状态(),
+  //     实体统计: this.实体管理器实例.获取实体统计(),
+  //     领主魔力: this.实体管理器实例.获取领主()?.获取属性('魔力') ?? 0,
+  //   };
+  // }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 游戏初始化器
+// ═══════════════════════════════════════════════════════════════
+
+function 创建游戏实例(运行时实体配置: 运行时实体配置, 初始化配置: 游戏初始化配置 = {}): 游戏总控 {
+  // 创建游戏总控
+  const 游戏 = new 游戏总控({
+    运行时配置: 运行时实体配置,
+    初始资源: 初始化配置,
+  });
+
+  // 创建并设置领主
+  const 领主 = 游戏.领主管理.创建领主({
+    姓名: 初始化配置.领主姓名 ?? '无名领主',
+    魔力: 初始化配置.初始魔力 ?? 10,
+  });
+
+
+  // 初始化喽啰
+  if (初始化配置.初始喽啰数 && 初始化配置.初始喽啰数 > 0) {
+    const 无将领池 = 游戏.喽啰池管理.获取无将领喽啰池();
+    无将领池.增加喽啰(初始化配置.初始喽啰数, '未武装');
+  }
+
+  return 游戏;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// 导出
+// ═══════════════════════════════════════════════════════════════
+
+export { 创建游戏实例, 实体管理器, 游戏总控, 资源管理器 };
+
+export type { 游戏初始化配置, 资源状态 };
+
+
+
+
+
+// stores/gameStore.ts
+import type { 冠军实体, 可袭击地点实体, 母畜实体, 领主实体 } from '@/core/entities';
+import type { 回合结算摘要 } from '@/types';
+import { defineStore } from 'pinia';
+import { computed, reactive, ref, shallowRef } from 'vue';
+import { 启动游戏 } from '../game/bootstrap';
+import type { 游戏总控 } from '../game/controller';
+
+interface 任务配置类型 {
+  描述?: string;
+  行动力消耗?: number;
+  需要目标?: boolean;
+  目标实体类型?: string | null;
+  执行人实体类型?: string | null;
+}
+
+// 目标选项类型
+interface 目标选项 {
+  id: string;
+  名称: string;
+  类型: string;
+  附加信息?: string;
+}
+
+// 任务选择状态类型
+interface 任务选择状态类型 {
+  正在选择: boolean;
+  任务名: string | null;
+  执行人ID: string | null;
+  是否双层选择: boolean;
+  当前层级: number; // 0: 第一层（地点），1: 第二层（母畜）
+  已选地点ID: string | null;
+  已选地点名称: string | null;
+  可选目标列表: 目标选项[];
+}
+
+export const useGameStore = defineStore('game', () => {
+  // ─── 核心游戏实例 ───
+  const 游戏实例 = shallowRef<游戏总控 | null>(null);
+  const 已初始化 = ref(false);
+
+  // ─── UI 状态 ───
+  const 当前面板 = ref<string>('dashboard');
+  const 选中实体ID = ref<string | null>(null);
+  const 选中实体类型 = ref<'冠军' | '母畜' | '地点' | null>(null);
+  const 显示回合结算弹窗 = ref(false);
+  const 最新结算摘要 = ref<回合结算摘要 | null>(null);
+
+  const 预选任务名 = ref<string | null>(null);
+  const 预选执行人ID = ref<string | null>(null);
+  const 预选目标ID = ref<string | null>(null);
+
+  // ─── 通知系统 ───
+  const 通知列表 = ref<
+    Array<{
+      id: number;
+      类型: 'success' | 'warning' | 'error' | 'info';
+      消息: string;
+      时间戳: number;
+    }>
+  >([]);
+  let 通知计数器 = 0;
+
+  // ─── 初始化游戏 ───
+  function 初始化() {
+    if (已初始化.value) return;
+
+    const 游戏 = 启动游戏();
+    游戏实例.value = 游戏;
+    已初始化.value = true;
+
+    添加通知('success', '游戏初始化成功！');
+  }
+
+  // 为不同类型的实体创建独立的更新标记
+  const championsUpdateMarker = ref(0);
+  const broodmothersUpdateMarker = ref(0);
+  const locationsUpdateMarker = ref(0);
+  const generalUpdateMarker = ref(0);
+  const 战斗状态 = ref(0);
+  const 喽啰状态 = ref(0);
+
+  // ─── 更新方法 ───
+  const 更新冠军列表 = () => {
+    championsUpdateMarker.value++;
+  };
+
+  const 更新母畜列表 = () => {
+    broodmothersUpdateMarker.value++;
+  };
+
+  const 更新地点列表 = () => {
+    locationsUpdateMarker.value++;
+  };
+
+  const 更新通用状态 = () => {
+    generalUpdateMarker.value++;
+  };
+  const 更新战斗状态 = () => {
+    战斗状态.value++;
+  };
+  const 更新喽啰状态 = () => {
+    喽啰状态.value++;
+  };
+
+  const 检查状态更新 = () => {
+    championsUpdateMarker.value;
+    broodmothersUpdateMarker.value;
+    locationsUpdateMarker.value;
+    generalUpdateMarker.value;
+    战斗状态.value;
+    喽啰状态.value;
+  };
+
+  // ─── 计算属性 ───
+  const 领主 = computed(() => 游戏实例.value?.领主管理.获取领主() ?? null);
+
+  const 所有冠军 = computed(() => {
+    检查状态更新();
+    return 游戏实例.value?.冠军管理.获取所有冠军() ?? [];
+  });
+
+  const 所有母畜 = computed(() => {
+    检查状态更新();
+    return 游戏实例.value?.母畜管理.获取所有母畜() ?? [];
+  });
+
+  const 所有地点 = computed(() => {
+    检查状态更新();
+    return 游戏实例.value?.地点管理.获取所有地点() ?? [];
+  });
+
+  const 当前回合 = computed(() => {
+    检查状态更新();
+    return 游戏实例.value?.回合管理.获取当前回合() ?? 0;
+  });
+
+  const 资源状态 = computed(() => {
+    检查状态更新();
+    return {
+      士气: 游戏实例.value?.资源管理.获取士气() ?? 0,
+      最大士气: 游戏实例.value?.资源管理.获取最大士气() ?? 100,
+      催淫母乳: 游戏实例.value?.资源管理.获取催淫母乳数量() ?? 0,
+    };
+  });
+
+  const 魔力信息 = computed(() => {
+    检查状态更新();
+    return {
+      当前: 领主.value?.获取属性('魔力') ?? 0,
+      最大: 领主.value?.获取属性('最大魔力') ?? 100,
+      百分比: 领主.value?.获取魔力百分比() ?? 0,
+    };
+  });
+
+  const 喽啰总数 = computed(() => {
+    检查状态更新();
+    return 游戏实例.value?.喽啰池管理.获取喽啰总数() ?? 0;
+  });
+
+  const 已发布任务列表 = computed(() => {
+    检查状态更新();
+    return 游戏实例.value?.任务管理.获取已发布任务列表() ?? [];
+  });
+
+  const 已发现母畜的地点列表 = computed(() => {
+    检查状态更新();
+    return (
+      游戏实例.value?.地点管理.获取所有地点().filter(p => {
+        return p.已侦察母畜.size > 0;
+      }) ?? []
+    );
+  });
+
+  // ─── 行动力 ───
+  const 最大行动力 = computed(() => {
+    检查状态更新();
+    return 游戏实例.value?.任务管理.获取最大行动力() ?? 3;
+  });
+  const 当前行动力 = computed(() => {
+    检查状态更新();
+    return 游戏实例.value?.任务管理.获取剩余行动力() ?? 3;
+  });
+
+  // ─── 选中实体 ───
+  const 选中的冠军 = computed(() => {
+    检查状态更新();
+    if (选中实体类型.value !== '冠军' || !选中实体ID.value) return null;
+    return 游戏实例.value?.冠军管理.获取冠军(选中实体ID.value) ?? null;
+  });
+
+  const 选中的母畜 = computed(() => {
+    检查状态更新();
+    if (选中实体类型.value !== '母畜' || !选中实体ID.value) return null;
+    return 游戏实例.value?.母畜管理.获取母畜(选中实体ID.value) ?? null;
+  });
+
+  const 选中的地点 = computed(() => {
+    检查状态更新();
+    if (选中实体类型.value !== '地点' || !选中实体ID.value) return null;
+    return 游戏实例.value?.地点管理.获取地点(选中实体ID.value) ?? null;
+  });
+
+  // ════════════════════════════════════════════════════════════════
+  // ████████ 任务选择状态管理（重构） ████████
+  // ════════════════════════════════════════════════════════════════
+
+  const 任务选择状态 = reactive<任务选择状态类型>({
+    正在选择: false,
+    任务名: null,
+    执行人ID: null,
+    是否双层选择: false,
+    当前层级: 0,
+    已选地点ID: null,
+    已选地点名称: null,
+    可选目标列表: [],
+  });
+
+  // 重置任务选择状态
+  function 重置任务选择状态() {
+    任务选择状态.正在选择 = false;
+    任务选择状态.任务名 = null;
+    任务选择状态.执行人ID = null;
+    任务选择状态.是否双层选择 = false;
+    任务选择状态.当前层级 = 0;
+    任务选择状态.已选地点ID = null;
+    任务选择状态.已选地点名称 = null;
+    任务选择状态.可选目标列表 = [];
+  }
+
+  // 判断任务是否需要双层选择
+  function 判断是否双层选择任务(任务名: string): boolean {
+    const 配置 = 游戏实例.value?.任务管理.获取任务配置(任务名) as 任务配置类型 | undefined;
+    return 配置?.目标实体类型 === '可袭击地点实体-母畜实体';
+  }
+
+  // 获取任务的目标实体类型
+  function 获取任务目标类型(任务名: string): string | null {
+    const 配置 = 游戏实例.value?.任务管理.获取任务配置(任务名) as 任务配置类型 | undefined;
+    return 配置?.目标实体类型 ?? null;
+  }
+
+  // 根据目标类型构建可选目标列表
+  function 构建目标列表(目标类型: string, 执行人ID: string): 目标选项[] {
+    const 结果: 目标选项[] = [];
+
+    switch (目标类型) {
+      case '冠军实体':
+        所有冠军.value
+        .filter(m => m.实体ID !== 执行人ID && !游戏实例.value?.任务管理.是否被占用(m.实体ID))
+        .forEach(c => {
+          结果.push({
+            id: c.实体ID,
+            名称: c.获取属性('姓名'),
+            类型: '冠军',
+          });
+        });
+        break;
+
+      case '母畜实体':
+        所有母畜.value
+          .filter(m => m.实体ID !== 执行人ID && !游戏实例.value?.任务管理.是否被占用(m.实体ID))
+          .forEach(m => {
+            结果.push({
+              id: m.实体ID,
+              名称: m.获取属性('姓名'),
+              类型: '母畜',
+              附加信息: `臣服度: ${m.获取属性('臣服度')}`,
+            });
+          });
+        break;
+
+      case '地点实体':
+        所有地点.value.forEach(l => {
+          结果.push({
+            id: l.实体ID,
+            名称: l.地点名称,
+            类型: '地点',
+            附加信息: l.地点类型,
+          });
+        });
+        break;
+
+      case '可袭击地点实体':
+        所有地点.value.forEach(l => {
+          结果.push({
+            id: l.实体ID,
+            名称: l.地点名称,
+            类型: '地点',
+            附加信息: l.地点类型,
+          });
+        });
+        break;
+
+      // 双层选择的第一层：已发现母畜的地点
+      case '可袭击地点实体-母畜实体':
+        已发现母畜的地点列表.value.forEach(l => {
+          结果.push({
+            id: l.实体ID,
+            名称: l.地点名称,
+            类型: '地点',
+            附加信息: `已发现 ${l.已侦察母畜.size} 名母畜`,
+          });
+        });
+        break;
+    }
+
+    return 结果;
+  }
+
+  // 构建地点内的母畜目标列表
+  function 构建地点母畜列表(地点ID: string): 目标选项[] {
+    const 地点 = 游戏实例.value?.地点管理.获取地点(地点ID);
+    if (!地点) return [];
+
+    const 结果: 目标选项[] = [];
+    地点.已侦察母畜.forEach(母畜 => {
+      结果.push({
+        id: 母畜.实体ID,
+        名称: 母畜.获取属性('姓名'),
+        类型: '母畜',
+        附加信息: `${母畜.获取属性('种族')} | 魅力: ${母畜.获取属性('魅力')}`,
+      });
+    });
+    return 结果;
+  }
+
+  // ═══════════════════════════════════════════════════
+  // 开始任务目标选择（统一入口）
+  // ═══════════════════════════════════════════════════
+  function 开始任务目标选择(任务名: string, 执行人ID: string) {
+    const 目标类型 = 获取任务目标类型(任务名);
+    if (!目标类型) {
+      // 无需目标，直接发布
+      发布任务(任务名, 执行人ID);
+      return;
+    }
+
+    const 是双层 = 判断是否双层选择任务(任务名);
+
+    // 初始化选择状态
+    任务选择状态.正在选择 = true;
+    任务选择状态.任务名 = 任务名;
+    任务选择状态.执行人ID = 执行人ID;
+    任务选择状态.是否双层选择 = 是双层;
+    任务选择状态.当前层级 = 0;
+    任务选择状态.已选地点ID = null;
+    任务选择状态.已选地点名称 = null;
+
+    // 构建第一层目标列表
+    任务选择状态.可选目标列表 = 构建目标列表(目标类型, 执行人ID);
+  }
+
+  // 直接发布无目标任务
+  function 直接发布无目标任务(任务名: string, 执行人ID: string) {
+    发布任务(任务名, 执行人ID);
+  }
+
+  // ═══════════════════════════════════════════════════
+  // 选择目标（处理单层和双层选择）
+  // ═══════════════════════════════════════════════════
+  function 选择目标(目标ID: string) {
+    if (!任务选择状态.正在选择 || !任务选择状态.任务名 || !任务选择状态.执行人ID) {
+      return;
+    }
+
+    // 双层选择且当前是第一层（选地点）
+    if (任务选择状态.是否双层选择 && 任务选择状态.当前层级 === 0) {
+      const 选中地点 = 任务选择状态.可选目标列表.find(t => t.id === 目标ID);
+      if (!选中地点) return;
+
+      // 记录已选地点，进入第二层
+      任务选择状态.已选地点ID = 目标ID;
+      任务选择状态.已选地点名称 = 选中地点.名称;
+      任务选择状态.当前层级 = 1;
+
+      // 构建第二层目标列表（该地点的母畜）
+      任务选择状态.可选目标列表 = 构建地点母畜列表(目标ID);
+      return;
+    }
+
+    // 单层选择 或 双层选择的第二层（选母畜）
+    // 最终目标ID就是当前选择的目标
+    发布任务(任务选择状态.任务名, 任务选择状态.执行人ID, 目标ID);
+    重置任务选择状态();
+  }
+
+  // 返回上一层（双层选择专用）
+  function 返回上一层选择() {
+    if (!任务选择状态.是否双层选择 || 任务选择状态.当前层级 !== 1) {
+      return;
+    }
+
+    // 回到第一层
+    任务选择状态.当前层级 = 0;
+    任务选择状态.已选地点ID = null;
+    任务选择状态.已选地点名称 = null;
+
+    // 重新构建第一层目标列表
+    const 目标类型 = 获取任务目标类型(任务选择状态.任务名!);
+    if (目标类型) {
+      任务选择状态.可选目标列表 = 构建目标列表(目标类型, 任务选择状态.执行人ID!);
+    }
+  }
+
+  // 取消任务选择
+  function 取消任务选择() {
+    重置任务选择状态();
+  }
+
+  // 获取当前选择层级标题
+  const 当前选择层级标题 = computed(() => {
+    if (!任务选择状态.正在选择) return '';
+
+    if (任务选择状态.是否双层选择) {
+      if (任务选择状态.当前层级 === 0) {
+        return '选择地点';
+      } else {
+        return `选择母畜 (${任务选择状态.已选地点名称})`;
+      }
+    }
+
+    return '选择目标';
+  });
+
+  // ─── 操作方法 ───
+  function 选择实体(实体ID: string, 类型: '冠军' | '母畜' | '地点') {
+    选中实体ID.value = 实体ID;
+    选中实体类型.value = 类型;
+  }
+
+  function 清除选择() {
+    选中实体ID.value = null;
+    选中实体类型.value = null;
+  }
+
+  function 切换面板(panelId: string): void {
+    检查状态更新();
+    当前面板.value = panelId;
+    清除选择();
+  }
+
+  // ─── 任务系统 ───
+  function 发布任务(任务名: string, 执行人ID: string, 目标ID?: string) {
+    更新通用状态();
+    if (!游戏实例.value) return { 成功: false, 原因: '游戏未初始化' };
+
+    const 执行人 = 游戏实例.value.实体管理.获取实体(执行人ID);
+    const 目标 = 目标ID ? 游戏实例.value.实体管理.获取实体(目标ID) : null;
+
+    if (!执行人) return { 成功: false, 原因: '执行人不存在' };
+
+    const 结果 = 游戏实例.value.任务管理.发布任务(任务名, 执行人 as any, 目标 as any);
+
+    if (结果.成功) {
+      添加通知('success', `任务「${任务名}」已发布`);
+    } else {
+      添加通知('error', `任务发布失败: ${结果.原因}`);
+    }
+
+    return 结果;
+  }
+
+  function 取消任务(任务ID: string) {
+    更新通用状态();
+    if (!游戏实例.value) return;
+
+    const 结果 = 游戏实例.value.任务管理.取消任务(任务ID);
+    if (结果.成功) {
+      添加通知('info', '任务已取消');
+    }
+    return 结果;
+  }
+
+  // ─── 法术系统 ───
+  function 使用法术(法术名: string, 倍率: number, 目标ID?: string) {
+    更新通用状态();
+    if (!游戏实例.value) return { 成功: false, 原因: '游戏未初始化' };
+
+    const 目标 = 目标ID ? 游戏实例.value.实体管理.获取实体(目标ID) : null;
+    const 结果 = 游戏实例.value.资源管理.使用法术(法术名, 倍率, 目标 as any);
+
+    if (结果.成功) {
+      添加通知('success', `法术「${法术名}」施放成功`);
+    } else {
+      添加通知('error', `法术施放失败: ${结果.原因}`);
+    }
+
+    return 结果;
+  }
+
+  // ─── 黑市系统 ───
+  function 购买商品(商品名: string, 数量: number, 目标ID?: string) {
+    更新通用状态();
+    if (!游戏实例.value) return { 成功: false, 原因: '游戏未初始化' };
+
+    const 目标 = 目标ID ? 游戏实例.value.实体管理.获取实体(目标ID) : null;
+    const 结果 = 游戏实例.value.资源管理.购买商品(商品名, 数量, 目标 as any);
+
+    if (结果.成功) {
+      添加通知('success', `成功购买「${商品名}」×${数量}`);
+    } else {
+      添加通知('error', `购买失败: ${结果.原因}`);
+    }
+
+    return 结果;
+  }
+
+  function 购买奴隶(商品ID: string) {
+    更新母畜列表();
+    if (!游戏实例.value) return { 成功: false, 原因: '游戏未初始化' };
+
+    const 结果 = 游戏实例.value.资源管理.购买奴隶(商品ID);
+
+    if (结果.成功) {
+      添加通知('success', `成功购买奴隶`);
+    } else {
+      添加通知('error', `购买失败: ${结果.原因}`);
+    }
+
+    return 结果;
+  }
+
+  // ─── 战斗系统 ───
+  function 选择战斗目标(地点ID: string) {
+    if (!游戏实例.value) return { 成功: false };
+    return 游戏实例.value.战斗管理.选择目标(地点ID);
+  }
+
+  function 添加出战将领(将领ID: string) {
+    更新冠军列表();
+    if (!游戏实例.value) return { 成功: false };
+    return 游戏实例.value.战斗管理.添加出战将领(将领ID);
+  }
+
+  function 移除出战将领(将领ID: string) {
+    更新冠军列表();
+    if (!游戏实例.value) return { 成功: false };
+    return 游戏实例.value.战斗管理.移除出战将领(将领ID);
+  }
+
+  function 确认战斗() {
+    if (!游戏实例.value) return { 成功: false };
+    const 结果 = 游戏实例.value.战斗管理.确认战斗();
+    if (结果.成功) {
+      添加通知('info', '战斗已确认，将在回合结算时执行');
+    } else {
+      添加通知('error', `战斗确认失败: ${结果.原因}`);
+    }
+    return 结果;
+  }
+
+  function 获取战斗预览() {
+    return 游戏实例.value?.战斗管理.获取战斗预览() ?? null;
+  }
+
+  // ─── 回合系统 ───
+  function 结束回合() {
+    if (!游戏实例.value) return;
+
+    const 摘要 = 游戏实例.value.回合管理.结束回合();
+    最新结算摘要.value = 摘要;
+    显示回合结算弹窗.value = true;
+
+    添加通知('info', `第 ${摘要.回合数} 回合结束`);
+    更新通用状态();
+    return 摘要;
+  }
+
+  // ─── 通知系统 ───
+  function 添加通知(类型: 'success' | 'warning' | 'error' | 'info', 消息: string) {
+    const 通知 = {
+      id: ++通知计数器,
+      类型,
+      消息,
+      时间戳: Date.now(),
+    };
+    通知列表.value.push(通知);
+
+    setTimeout(() => {
+      移除通知(通知.id);
+    }, 5000);
+  }
+
+  function 移除通知(id: number) {
+    const 索引 = 通知列表.value.findIndex(n => n.id === id);
+    if (索引 !== -1) {
+      通知列表.value.splice(索引, 1);
+    }
+  }
+
+  function 获取姓名(id: string): string {
+    检查状态更新();
+    const 游戏实体 = 游戏实例.value?.实体管理.获取实体(id);
+    console.log(游戏实体);
+    
+    switch (游戏实体?.实体类型) {
+      case '冠军':
+        const 冠军 = 游戏实体 as 冠军实体;
+        return 冠军.获取属性('姓名');
+      case '母畜':
+        const 母畜 = 游戏实体 as 母畜实体;
+        return 母畜.获取属性('姓名');
+      case '领主':
+        const 领主 = 游戏实体 as 领主实体;
+        return 领主.获取属性('姓名');
+      case '可袭击地点':
+        const 地点 = 游戏实体 as 可袭击地点实体;
+        return 地点.地点名称;
+      default:
+        return '未知';
+    }
+  }
+
+  function 自动分配喽啰(): void {
+    更新喽啰状态();
+    游戏实例.value?.喽啰池管理.自动分配();
+  }
+
+  function 清空将领喽啰(championId: string): void {
+    更新喽啰状态();
+    游戏实例.value?.喽啰池管理.清空将领喽啰池(championId);
+  }
+
+  function 填满将领喽啰(championId: string): void {
+    更新喽啰状态();
+    游戏实例.value?.喽啰池管理.快速填充到上限(championId);
+  }
+
+  function 清空所有喽啰(): void {
+    更新喽啰状态();
+    游戏实例.value?.喽啰池管理.清空所有将领喽啰池();
+  }
+
+  // ========== 任务系统辅助 ==========
+  function 检查实体是否有任务(entityId: string): boolean {
+    return 游戏实例.value?.任务管理.是否被占用(entityId) ?? false;
+  }
+
+  function 预选任务(taskName: string, executorId?: string, targetId?: string): void {
+    预选任务名.value = taskName;
+    预选执行人ID.value = executorId ?? null;
+    预选目标ID.value = targetId ?? null;
+  }
+
+  function 清除预选任务(): void {
+    预选任务名.value = null;
+    预选执行人ID.value = null;
+    预选目标ID.value = null;
+  }
+
+  function 获取预选任务(): {
+    任务名: string | null;
+    执行人ID: string | null;
+    目标ID: string | null;
+  } {
+    return {
+      任务名: 预选任务名.value,
+      执行人ID: 预选执行人ID.value,
+      目标ID: 预选目标ID.value,
+    };
+  }
+
+  // ========== 地点侦查 ==========
+  function 获取地点侦查进度(locationId: string): {
+    当前进度: number;
+    最大进度: number;
+    百分比: number;
+  } | null {
+    检查状态更新();
+    const 地点 = 游戏实例.value?.地点管理.获取地点(locationId);
+    if (!地点) return null;
+    const 当前进度 = 地点.侦察进度;
+    const 最大进度 = 地点.侦察最大值;
+    return { 当前进度, 最大进度, 百分比: (当前进度 / 最大进度) * 100 };
+  }
+
+  function 获取地点已发现母畜(locationId: string): Array<{
+    id: string;
+    name: string;
+    race: string;
+    fertility: number;
+    appeal: number;
+  }> | null {
+    检查状态更新();
+    const 地点 = 游戏实例.value?.地点管理.获取地点(locationId);
+    if (!地点) return null;
+    const result: Array<{
+      id: string;
+      name: string;
+      race: string;
+      fertility: number;
+      appeal: number;
+    }> = [];
+    地点.已侦察母畜.forEach(母畜 => {
+      result.push({
+        id: 母畜.实体ID,
+        name: 母畜.获取属性('姓名'),
+        race: 母畜.获取属性('种族'),
+        fertility: 母畜.获取属性('总生育力'),
+        appeal: 母畜.获取属性('魅力'),
+      });
+    });
+    return result;
+  }
+
+  function 获取地点未发现母畜数量(locationId: string): number | null {
+    检查状态更新();
+    const 地点 = 游戏实例.value?.地点管理.获取地点(locationId);
+    if (!地点) return null;
+    return 地点.获取潜在母畜数量();
+  }
+
+  // ─── 存档系统 ───
+  function 保存游戏() {
+    更新通用状态();
+    if (!游戏实例.value) return { 成功: false };
+    const 结果 = 游戏实例.value.存档管理.保存游戏(游戏实例.value);
+    if (结果.成功) {
+      添加通知('success', '游戏已保存');
+    }
+    return 结果;
+  }
+
+  function 加载游戏() {
+    更新通用状态();
+    if (!游戏实例.value) return { 成功: false };
+    const 结果 = 游戏实例.value.存档管理.加载存档();
+    if (结果.成功) {
+      添加通知('success', '游戏已加载');
+    }
+    return 结果;
+  }
+
+  return {
+    // 状态
+    游戏实例,
+    已初始化,
+    当前面板,
+    选中实体ID,
+    选中实体类型,
+    显示回合结算弹窗,
+    最新结算摘要,
+    通知列表,
+    预选任务名,
+    预选执行人ID,
+    预选目标ID,
+    最大行动力,
+    当前行动力,
+
+    // 计算属性
+    领主,
+    所有冠军,
+    所有母畜,
+    所有地点,
+    已发现母畜的地点列表,
+    当前回合,
+    资源状态,
+    魔力信息,
+    喽啰总数,
+    已发布任务列表,
+    选中的冠军,
+    选中的母畜,
+    选中的地点,
+
+    // 任务选择状态
+    任务选择状态,
+    当前选择层级标题,
+
+    // 方法
+    初始化,
+    更新冠军列表,
+    更新母畜列表,
+    更新地点列表,
+    更新通用状态,
+    检查状态更新,
+    选择实体,
+    获取姓名,
+    清除选择,
+    切换面板,
+
+    // 任务相关
+    发布任务,
+    取消任务,
+    开始任务目标选择,
+    直接发布无目标任务,
+    选择目标,
+    返回上一层选择,
+    取消任务选择,
+    检查实体是否有任务,
+    预选任务,
+    清除预选任务,
+    获取预选任务,
+
+    // 其他系统
+    使用法术,
+    购买商品,
+    购买奴隶,
+    选择战斗目标,
+    添加出战将领,
+    移除出战将领,
+    确认战斗,
+    获取战斗预览,
+    结束回合,
+    添加通知,
+    移除通知,
+    自动分配喽啰,
+    清空将领喽啰,
+    填满将领喽啰,
+    清空所有喽啰,
+    获取地点侦查进度,
+    获取地点已发现母畜,
+    获取地点未发现母畜数量,
+    保存游戏,
+    加载游戏,
+  };
+});
+
+
+// ═══════════════════════════════════════════════════════════════
+// core/types/common.ts
+// 共享基础类型定义
+// ═══════════════════════════════════════════════════════════════
+
+// ─── 武装等级 ───
+export type 武装等级 = '未武装' | '低级武装' | '中级武装' | '高级武装' | '精英武装';
+
+// ─── 属性相关 ───
+export interface 属性系数 {
+    力量: number;
+    敏捷: number;
+    智力: number;
+}
+
+export interface 属性约束配置 {
+    最小值: number;
+    最大值: number;
+}
+
+// ─── 姓名生成 ───
+export interface 姓名池配置 {
+    前缀: string[];
+    主名: string[];
+    后缀: string[];
+}
+
+// ─── 数值范围 ───
+export interface 数值范围 {
+    最小: number;
+    最大: number;
+}
+
+// ─── 元数据 ───
+export interface 元数据配置 {
+    创建时间: number;
+    [key: string]: unknown;
+}
+
+// ─── 事件处理器 ───
+export type 事件处理器<T = unknown> = (数据: T, 实体: unknown) => void;
+
+// ═══════════════════════════════════════════════════════════════
+// core/types/controller.ts
+// 游戏总控相关类型定义
+// ═══════════════════════════════════════════════════════════════
+
+// ─── 资源状态 ───
+export interface 资源状态 {
+    士气: number;
+    最大士气: number;
+    催淫母乳: number;
+}
+
+// ─── 实体统计 ───
+export interface 实体统计 {
+    领主数量: number;
+    冠军数量: number;
+    母畜数量: number;
+    地点数量: number;
+    喽啰池数量: number;
+    喽啰总数: number;
+}
+
+// ─── 游戏初始化配置 ───
+export interface 游戏初始化配置 {
+    领主姓名?: string;
+    初始魔力?: number;
+    初始士气?: number;
+    最大士气?: number;
+    初始催淫母乳?: number;
+    初始喽啰数?: number;
+};
+
+// ─── 游戏状态 ───
+export interface 游戏状态 {
+    回合数: number;
+    资源状态: 资源状态;
+    实体统计: 实体统计;
+    领主魔力: number;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// core/types/entities.ts
+// 实体相关类型定义
+// ═══════════════════════════════════════════════════════════════
+
+import type { 冠军实体, 喽啰池实体, 母畜实体 } from '../core/entities';
+import type { 属性约束配置, 元数据配置, 武装等级 } from './common';
+
+// ─── 实体基类 ───
+export interface 实体初始数据 {
+    实体ID?: string;
+    元数据?: Partial<元数据配置>;
+    属性约束?: Map<string, 属性约束配置>;
+}
+
+export interface 实体基类属性Schema {
+    [key: string]: unknown;
+}
+
+// ─── 领主 ───
+export interface 领主属性Schema extends 实体基类属性Schema {
+    魔力: number;
+    最大魔力: number;
+    姓名: string;
+}
+
+export interface 领主初始数据 extends 实体初始数据 {
+    魔力?: number;
+    最大魔力?: number;
+    姓名?: string;
+}
+
+export interface 魔力操作结果 {
+    成功: boolean;
+    原因?: string;
+    当前?: number;
+    需要?: number;
+    剩余?: number;
+}
+
+export interface 魔力获得结果 {
+    实际获得: number;
+    当前: number;
+    溢出: number;
+}
+
+// ─── 冠军 ───
+export interface 冠军属性Schema extends 实体基类属性Schema {
+    姓名: string;
+    性别: string;
+    力量: number;
+    敏捷: number;
+    智力: number;
+    来源: string;
+    生母: string;
+}
+
+export interface 冠军初始数据 extends 实体初始数据 {
+    姓名?: string;
+    性别?: string;
+    力量?: number;
+    敏捷?: number;
+    智力?: number;
+    管理喽啰池?: 喽啰池实体;
+    来源?: string;
+    生母?: string | null;
+}
+
+// ─── 母畜 ───
+export interface 母畜属性Schema extends 实体基类属性Schema {
+    姓名: string;
+    种族: string;
+    年龄: number;
+    原身份: string;
+    来源: string;
+    描述: string;
+    总生育力: number;
+    剩余生育力: number;
+    淫乱度: number;
+    臣服度: number;
+    魅力: number;
+}
+
+export interface 母畜特性 {
+    序号: number;
+    特性名称?: string;
+    描述?: string;
+}
+
+export interface 母畜初始数据 extends 实体初始数据 {
+    姓名?: string;
+    种族?: string;
+    年龄?: number;
+    原身份?: string;
+    来源?: string;
+    描述?: string;
+    总生育力?: number;
+    剩余生育力?: number;
+    魅力?: number;
+    淫乱度?: number;
+    臣服度?: number;
+    特性列表?: string[];
+    来源地点ID?: string | null;
+    冠军生育记录?: string[];
+    喽啰生育记录?: number;
+    母畜特性列表?: 母畜特性[];
+}
+
+export interface 消耗结果 {
+    成功: boolean;
+    原因?: string;
+    当前?: number;
+    需要?: number;
+    剩余?: number;
+}
+
+// ─── 喽啰池 ───
+export interface 武装分组数据 {
+    数量: number;
+    战斗力: number;
+    描述: string;
+}
+
+export interface 武装等级配置 {
+    战斗力?: number;
+    描述?: string;
+}
+
+export interface 喽啰池初始数据 extends 实体初始数据 {
+    将领: 冠军实体 | null;
+    武装分组?: Map<武装等级, 武装分组数据>;
+}
+
+export interface 减少喽啰结果 {
+    成功: boolean;
+    原因?: string;
+    实际减少?: number;
+    剩余?: number;
+}
+
+export interface 武装升级结果 {
+    升级数量: number;
+    溢出数量: number;
+}
+
+export interface 分组详情 {
+    等级: 武装等级;
+    数量: number;
+    战斗力: number;
+    描述: string;
+}
+
+export interface 分配喽啰结果 {
+    成功: boolean;
+    原因?: string;
+    分配数量: number;
+    未满足数量?: number;
+    分配详情: Array<{ 等级: string; 数量: number }>;
+}
+
+// ─── 可袭击地点 ───
+export interface 可袭击地点属性Schema extends 实体基类属性Schema {
+    战斗力: number;
+}
+
+export interface 可袭击地点配置 {
+    实体ID: string,
+    地点名称?: string;
+    地点类型?: string;
+    描述?: string;
+    侦察最大值?: number;
+    侦察进度?: number;
+    战斗力?: number;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// core/types/factories.ts
+// 工厂相关类型定义
+// ═══════════════════════════════════════════════════════════════
+import { 冠军实体, 可袭击地点实体, 母畜实体, 领主实体, type 武装等级配置 } from '../core/entities';
+
+import type { 姓名池配置, 属性系数, 数值范围 } from './common';
+import type { 奴隶刷新配置 } from './systems';
+
+// ─── 生育效率表 ───
+// export interface 生育效率表 {
+//     身份系数表: Map<string, 属性系数>;
+//     种族系数表: Map<string, 属性系数>;
+// }
+
+// ─── 冠军工厂 ───
+export interface 冠军工厂配置 {
+    冠军姓名池: 姓名池配置;
+    生育消耗: number;
+    属性随机浮动范围: number;
+    前缀概率: number;
+    后缀概率: number;
+    母畜种族配置: Map<string, 种族配置数据>;
+    母畜身份配置: Map<string, 身份配置数据>;
+}
+
+export interface 生育选项 {
+    姓名?: string;
+    性别?: string;
+}
+
+export interface 属性预估范围 {
+    最小: number;
+    最大: number;
+    期望: number;
+}
+
+export interface 生育属性预估 {
+    力量: 属性预估范围;
+    敏捷: 属性预估范围;
+    智力: 属性预估范围;
+}
+
+// ─── 母畜工厂 ───
+export interface 种族配置数据 {
+    姓名池: 姓名池配置;
+    前缀概率: number;
+    后缀概率: number;
+    生育系数: 属性系数;
+    生育力基础值: number;
+    魅力系数: number;
+}
+
+export interface 身份配置数据 {
+    最小年龄: number;
+    最大年龄: number;
+    生育系数: 属性系数;
+    生育力系数: number;
+    魅力基础值: number;
+}
+
+export interface 母畜工厂配置 {
+    种族配置: Map<string, 种族配置数据>;
+    身份配置: Map<string, 身份配置数据>;
+}
+
+export interface 母畜创建配置 {
+    姓名?: string;
+    种族?: string;
+    身份?: string;
+    年龄?: number;
+    来源?: string;
+    描述?: string;
+    魅力?: number;
+    臣服度?: number;
+    淫乱度?: number;
+    来源地点ID?: string;
+    总生育力?: number;
+    剩余生育力?: number;
+    捕获回合?: number;
+}
+
+// ─── 领主工厂 ───
+export interface 领主工厂配置 {
+    初始魔力: number;
+    最大魔力: number;
+    默认姓名: string;
+}
+
+export interface 领主创建配置 {
+    魔力?: number;
+    最大魔力?: number;
+    姓名?: string;
+}
+
+// ─── 可袭击地点工厂 ───
+export interface 身份分布权重 {
+    [key: string]: number;
+}
+
+export interface 种族分布权重 {
+    [key: string]: number;
+}
+
+export interface 地点名称池 {
+    描述: string;
+    前缀: string[];
+    中缀: string[];
+    后缀: string[];
+}
+
+export interface 地点类型配置数据 {
+    地点名称池: 地点名称池;
+    战斗力范围: 数值范围;
+    侦察最大值: number;
+    母畜数量范围: 数值范围;
+    身份分布: 身份分布权重;
+    种族分布: 种族分布权重;
+}
+
+export interface 可袭击地点工厂配置 {
+    地点类型配置?: Map<string, 地点类型配置数据>;
+}
+
+export interface 地点创建配置 {
+    名称?: string;
+    描述?: string;
+    战斗力?: number;
+    侦察进度?: number;
+    侦察最大值?: number;
+    母畜数量?: number;
+}
+
+// ─── 运行时配置 ───
+export interface 运行时实体配置 {
+    冠军配置?: 冠军工厂配置;
+    母畜配置?: 母畜工厂配置;
+    领主配置?: 领主工厂配置;
+    地点配置?: 可袭击地点工厂配置;
+    喽啰池配置?: 武装等级配置[];
+    黑市奴隶刷新配置?: 奴隶刷新配置;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// core/types/index.ts
+// 类型统一导出
+// ═══════════════════════════════════════════════════════════════
+
+export * from './common';
+export * from './entities';
+export * from './factories';
+export * from './systems';
+export * from './managers';
+
+// ═══════════════════════════════════════════════════════════════
+// types/managers.ts
+// 管理器类型定义
+// ═══════════════════════════════════════════════════════════════
+import type { 武装等级 } from "@/types/index";
+import type { 冠军实体, 喽啰池实体, 可袭击地点实体 } from "@/core/entities";
+import type { 任务管理器, 实体管理器 } from "@/core/managers";
+
+export interface 分配请求 {
+    武装等级: 武装等级;
+    数量: number;
+}
+
+export interface 分配结果 {
+    成功: boolean;
+    原因?: string;
+    实际分配: number;
+    分配详情: Array<{ 等级: string; 数量: number }>;
+}
+
+export interface 战斗部署 {
+    将领ID: string;
+    将领: 冠军实体;
+    喽啰池: 喽啰池实体;
+    战斗力: number;
+}
+
+export interface 战斗配置 {
+    目标地点: 可袭击地点实体;
+    部署列表: 战斗部署[];
+    是否突袭: boolean;
+    总行动力消耗: number;
+}
+
+export interface 战斗结果 {
+    成功: boolean;
+    胜利: boolean;
+    原因?: string;
+    目标: string;
+    损失: number;
+    我方战斗力: number;
+    敌方战斗力: number;
+    战损比例?: number;
+    俘获母畜?: string[];
+    战利品?: Record<string, number>;
+}
+
+// ─── 战斗预览 ───
+export interface 战斗预览 {
+    可执行: boolean;
+    原因?: string;
+    目标?: {
+        名称: string;
+        战斗力: number;
+    };
+    我方?: {
+        总战斗力: number;
+        将领数量: number;
+        行动力消耗: number;
+        突袭模式: boolean;
+    };
+    胜率预估?: number;
+}
+
+export interface 快速填充结果 {
+    成功: boolean;
+    原因?: string;
+    填充数量: number;
+    当前战斗力: number;
+    填充详情: Array<{ 等级: string; 数量: number }>;
+}
+
+export interface 资源状态 {
+    士气: number;
+    最大士气: number;
+    催淫母乳: number;
+}
+
+export interface 实体统计 {
+    领主数量: number;
+    冠军数量: number;
+    母畜数量: number;
+    地点数量: number;
+    喽啰总数: number;
+}
+// ═══════════════════════════════════════════════════════════════
+// types/persistence.ts
+// 存档系统类型定义
+// ═══════════════════════════════════════════════════════════════
+
+import type { 武装等级 } from './common';
+
+/** 领主序列化数据 */
+export interface 领主存档数据 {
+    实体ID: string;
+    姓名: string;
+    魔力: number;
+    最大魔力: number;
+}
+
+/** 冠军序列化数据 */
+export interface 冠军存档数据 {
+    实体ID: string;
+    姓名: string;
+    性别: string;
+    力量: number;
+    敏捷: number;
+    智力: number;
+    来源: string;
+    生母: string;
+    喽啰池数据: 喽啰池存档数据 | null;
+}
+
+/** 喽啰池序列化数据 */
+export interface 喽啰池存档数据 {
+    实体ID: string;
+    将领ID: string | null;
+    武装分组: Array<{
+        等级: 武装等级;
+        数量: number;
+    }>;
+}
+
+/** 母畜序列化数据 */
+export interface 母畜存档数据 {
+    实体ID: string;
+    姓名: string;
+    种族: string;
+    年龄: number;
+    原身份: string;
+    来源: string;
+    描述: string;
+    总生育力: number;
+    剩余生育力: number;
+    淫乱度: number;
+    臣服度: number;
+    魅力: number;
+    特性列表: string[];
+    来源地点ID: string | null;
+    冠军生育记录: string[];
+    喽啰生育记录: number;
+}
+
+/** 可袭击地点序列化数据 */
+export interface 地点存档数据 {
+    实体ID: string;
+    地点名称: string;
+    地点类型: string;
+    描述: string;
+    侦察最大值: number;
+    侦察进度: number;
+    战斗力: number;
+    战斗力估值: number | null;
+    潜在母畜列表: 母畜存档数据[];
+    已侦察母畜列表: 母畜存档数据[];
+}
+
+/** 资源状态存档数据 */
+export interface 资源存档数据 {
+    士气: number;
+    最大士气: number;
+    催淫母乳: number;
+}
+
+/** 完整游戏存档数据 */
+export interface 游戏存档数据 {
+    版本号: string;
+    存档时间: number;
+    存档名称: string;
+    回合数: number;
+    领主: 领主存档数据;
+    冠军列表: 冠军存档数据[];
+    母畜列表: 母畜存档数据[];
+    地点列表: 地点存档数据[];
+    无将领喽啰池: 喽啰池存档数据;
+    资源状态: 资源存档数据;
+}
+
+/** 存档槽位信息 */
+export interface 存档槽位 {
+    槽位索引: number;
+    存档名称: string;
+    存档时间: number;
+    回合数: number;
+    领主姓名: string;
+    冠军数量: number;
+    母畜数量: number;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// core/types/systems.ts
+// 系统管理器相关类型定义
+// ═══════════════════════════════════════════════════════════════
+
+import type { 武装等级 } from './common';
+import type { 母畜实体, 冠军实体, 可袭击地点实体, 领主实体, 喽啰池实体 } from '../core/entities';
+import type { 战斗结果 } from './managers';
+import type { 领主创建配置 } from './factories';
+import type { 任务管理器, 回合管理器, 实体管理器, 战斗管理器, 法术管理器, 资源管理器, 黑市管理器 } from '@/core/managers';
+import type { 工厂管理器 } from '@/core/factories';
+import type { 存档管理器, 游戏存档数据 } from '@/core/persistence';
+
+// ─── 通用实体引用类型 ───
+// 使用字符串字面量避免循环引用，运行时由具体模块处理
+export type 可执行实体 = 冠军实体 | 母畜实体;
+export type 可目标实体 = 母畜实体 | 可袭击地点实体 | 喽啰池实体 | null;
+export type 实体类型 = 冠军实体 | 母畜实体 | 可袭击地点实体 | 领主实体 | 喽啰池实体;
+
+// ─── 任务系统 ───
+
+export interface 属性变化记录 {
+    [属性名: string]: [number | string, number | string];
+}
+
+export type 任务前置条件 = (执行人: 实体类型) => boolean;
+export type 行动力占用计算 = (执行人: 实体类型) => number;
+export type 任务执行效果 = (执行人: 实体类型, 目标: 实体类型 | null, 游戏总控?: 游戏总控接口) => 任务执行结果;
+
+export interface 任务配置 {
+    名称: string;
+    描述: string;
+    目标实体类型: '母畜实体' | '可袭击地点实体' | '领主实体' | '冠军实体' | '可袭击地点实体-母畜实体' | null;
+    执行人实体类型: '冠军实体' | '母畜实体' | '领主实体';
+    前置条件: {
+        类型?: 任务前置条件;
+        臣服度?: 任务前置条件;
+        淫乱度?: 任务前置条件;
+        生育力?: 任务前置条件;
+    };
+    行动力占用?: 行动力占用计算;
+    执行效果: 任务执行效果;
+    信息?: string;
+}
+
+export interface 任务系统接口 {
+    注册任务: (任务名: string, 配置: 任务配置) => void;
+}
+
+export interface 任务执行结果 {
+    成功: boolean;
+    类型: string;
+    执行人: 实体类型;
+    目标: 实体类型 | null;
+    变化?: 属性变化记录;
+    已侦察母畜?: 母畜实体[];
+    已获取母畜?: 母畜实体[];
+    已获取冠军?: 冠军实体[];
+    信息?: string;
+    原因?: string;
+}
+
+export interface 已发布任务 {
+    任务ID: string;
+    任务名: string;
+    执行人ID: string;
+    目标ID: string | null;
+    行动力占用: number;
+    发布时间: number;
+    执行人: 实体类型;
+    目标: 实体类型 | null;
+}
+
+export interface 任务结算结果 {
+    任务ID: string;
+    结果: 任务执行结果;
+}
+
+// ─── 法术系统 ───
+
+export type 法术执行效果 = (法术倍率: number, 目标: 实体类型 | null, 游戏总控: 游戏总控接口) => 法术执行结果;
+
+
+export interface 法术配置 {
+    名称: string;
+    价格: number;
+    目标类型: '冠军实体' | '母畜实体' | '可袭击地点实体' | '领主实体' | '喽啰池实体' | null;
+    描述: string;
+    法术倍率上限: number;
+    信息?: string;
+    执行效果: 法术执行效果;
+}
+
+export interface 法术系统接口 {
+    注册法术: (法术名: string, 配置: 法术配置) => void;
+}
+
+export interface 法术执行结果 {
+    成功: boolean;
+    类型: string;
+    目标: 实体类型 | null;
+    变化?: 属性变化记录;
+}
+
+
+
+export interface 法术使用记录 {
+    法术名: string;
+    倍率: number;
+    消耗魔力: number;
+    目标ID: string | null;
+    信息?: string;
+}
+
+// ─── 黑市系统 ───
+export type 商品执行效果 = (购买数量: number, 目标: 实体类型 | null, 游戏总控: 游戏总控接口) => 商品执行结果;
+
+export interface 商品执行效果结果 {
+    成功: boolean;
+    类型: string;
+    目标: 可目标实体 | 母畜实体 | null;
+    信息?: string;
+    变化?: Record<string, [number | string, number | string]>;
+}
+
+
+export interface 商品配置 {
+    名称: string;
+    价格: number;
+    目标类型: '无' | '母畜实体' | '可袭击地点实体' | '领主实体' | '冠军实体' | null;
+    类型: '消耗品' | '装备' | '道具' | '材料';
+    描述: string;
+    每周限购: number;
+    信息?: string;
+    执行效果: 商品执行效果;
+}
+
+export interface 黑市系统接口 {
+    注册商品: (商品名: string, 配置: 商品配置) => void;
+}
+
+export interface 商品执行结果 {
+    成功: boolean;
+    类型: string;
+    目标: 实体类型 | null;
+    信息?: string;
+    变化?: 属性变化记录;
+}
+
+export interface 商品实例 {
+    商品ID: string;
+    配置: 商品配置;
+    本周已购买: number;
+}
+
+export interface 商品购买记录 {
+    商品ID: string;
+    目标: 实体类型 | null;
+    数量: number;
+    总价: number;
+    信息?: string;
+}
+
+export interface 奴隶商品 {
+    商品ID: string;
+    母畜实体: 母畜实体;
+    价格: number;
+    已售出: boolean;
+}
+
+export interface 奴隶刷新配置 {
+    刷新数量范围: { 最小: number; 最大: number };
+    价格计算: (母畜: 母畜实体) => number;
+}
+
+export interface 购买结果 {
+    成功: boolean;
+    原因?: string;
+    消耗催淫母乳?: number;
+    执行结果?: 商品执行结果;
+}
+
+export interface 奴隶购买结果 {
+    成功: boolean;
+    原因?: string;
+    消耗催淫母乳?: number;
+    获得母畜?: 母畜实体;
+}
+
+// ─── 回合系统 ───
+export interface 回合结算摘要 {
+    回合数: number;
+    任务记录: string[];
+    法术记录: string[];
+    商品记录: string[];
+    战斗记录: string[];
+}
+
+// ─── 游戏总控接口 ───
+export interface 游戏总控接口 {
+    readonly 地点管理: {
+        获取地点: (地点ID: string) => 可袭击地点实体 | null;
+        添加地点: (地点: 可袭击地点实体) => void;
+        获取所有地点: () => 可袭击地点实体[];
+    };
+
+    readonly 母畜管理: {
+        从劝诱获取母畜: (母畜: 母畜实体) => void;
+        移除母畜: (母畜: 母畜实体) => void;
+        添加母畜: (母畜: 母畜实体) => void;
+        获取母畜: (母畜ID: string) => 母畜实体 | null;
+        获取所有母畜: () => 母畜实体[];
+    };
+
+    readonly 冠军管理: {
+        从生育获取冠军: (冠军: 冠军实体) => void;
+        添加冠军: (冠军: 冠军实体) => void;
+        获取冠军: (冠军ID: string) => 冠军实体 | null;
+        获取所有冠军: () => 冠军实体[];
+    };
+
+    readonly 喽啰池管理: {
+        获取喽啰总数: () => number;
+        获取无将领喽啰池: () => 喽啰池实体;
+        可升级数量: (目标等级: 武装等级) => number;
+        武装升级: (数量: number, 武装等级: 武装等级) => boolean;
+        自动分配: () => boolean;
+        清空所有将领喽啰池: () => void;
+    };
+
+    readonly 资源管理: {
+        获取士气: () => number;
+        修改士气: (增量: number) => number;
+        获取最大士气: () => number;
+        获取催淫母乳数量: () => number;
+        修改催淫母乳数量: (增量: number) => number;
+    };
+
+    readonly 实体管理: {
+        获取实体: (实体ID: string) => 实体类型 | null;
+    };
+
+    readonly 领主管理: {
+        创建领主: (配置: 领主创建配置) => 领主实体;
+        获取领主: () => 领主实体;
+        设置领主: (领主: 领主实体) => void;
+        修改魔力: (增量: number) => number;
+    };
+
+    readonly 系统管理: {
+        获取资源管理器: () => 资源管理器;
+        获取实体管理器: () => 实体管理器;
+        获取工厂管理器: () => 工厂管理器;
+        获取战斗管理器: () => 战斗管理器;
+        获取任务管理器: () => 任务管理器;
+        获取法术管理器: () => 法术管理器;
+        获取黑市管理器: () => 黑市管理器;
+        获取回合管理器: () => 回合管理器;
+    };
+
+    readonly 战斗管理: {
+        执行战斗: () => any;
+    };
+
+    readonly 回合管理: {
+        获取当前回合: () => number;
+        结束回合: () => any;
+        获取游戏状态: () => any;
+    };
+
+    readonly 存档管理: {
+        获取存档管理器: () => 存档管理器;
+        获取存档数据: () => 游戏存档数据 | null;
+        加载存档数据: (存档: 游戏存档数据) => { 成功: boolean; 原因?: string };
+    };
+}
+
+

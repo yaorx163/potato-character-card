@@ -1,0 +1,114 @@
+// styles/dark-fantasy.scss
+:root {
+    // 暗色系
+    --bg-primary: #1a1a1f;
+    --bg-secondary: #242429;
+    --bg-tertiary: #2d2d33;
+    --bg-hover: #35353d;
+  
+    // 边框
+    --border-dark: #3a3a42;
+    --border-light: #4a4a55;
+  
+    // 文字
+    --text-primary: #e8e6e3;
+    --text-secondary: #a8a5a0;
+    --text-dim: #6a6862;
+  
+    // 强调色
+    --accent-blood: #8b2635;
+    --accent-blood-light: #a83242;
+    --accent-gold: #c9a227;
+    --accent-poison: #4a7c3f;
+    --accent-mana: #4a5c8a;
+    --accent-corrupt: #6b4a7c;
+  
+    // 状态色
+    --success: #4a7c3f;
+    --warning: #8b6914;
+    --danger: #8b2635;
+    --info: #4a5c8a;
+  }
+  
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+  
+  // 滚动条
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-light);
+    border-radius: 2px;
+  }
+  
+  // 通用组件样式
+  .btn {
+    padding: 4px 10px;
+    border: 1px solid var(--border-dark);
+    border-radius: 2px;
+    background: var(--bg-tertiary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-size: 16px;
+    transition: all 0.15s;
+  
+    &:hover:not(:disabled) {
+      background: var(--bg-hover);
+      color: var(--text-primary);
+      border-color: var(--border-light);
+    }
+  
+    &:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+  
+    &--primary {
+      background: var(--accent-blood);
+      border-color: var(--accent-blood);
+      color: var(--text-primary);
+  
+      &:hover:not(:disabled) {
+        background: var(--accent-blood-light);
+      }
+    }
+  
+    &--small {
+      padding: 2px 6px;
+      font-size: 15px;
+    }
+  }
+  
+  .tag {
+    display: inline-block;
+    padding: 1px 5px;
+    font-size: 15px;
+    border-radius: 2px;
+    background: var(--bg-tertiary);
+    color: var(--text-dim);
+  
+    &--blood { background: rgba(139,38,53,0.3); color: #d4626f; }
+    &--gold { background: rgba(201,162,39,0.2); color: #d4b84a; }
+    &--mana { background: rgba(74,92,138,0.3); color: #7a9cd4; }
+    &--poison { background: rgba(74,124,63,0.3); color: #7ac46a; }
+  }
+  
+  .progress-bar {
+    height: 4px;
+    background: var(--bg-primary);
+    border-radius: 2px;
+    overflow: hidden;
+  
+    &__fill {
+      height: 100%;
+      transition: width 0.3s;
+    }
+  }
+  
