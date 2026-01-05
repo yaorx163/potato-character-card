@@ -179,7 +179,7 @@ function 处理任务点击(任务名: string, 需要目标: boolean) {
     <!-- 产奶信息 -->
     <div v-if="产奶信息" class="milk-info">
       <div class="milk-row">
-        <span class="milk-icon">✦</span>
+        <span class="milk-icon">⚪</span>
         <span>每回合产奶</span>
         <span class="milk-value">+{{ 产奶信息.每回合 }}</span>
       </div>

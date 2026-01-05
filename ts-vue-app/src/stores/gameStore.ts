@@ -1,5 +1,5 @@
 // stores/gameStore.ts
-import type { 冠军实体, 母畜实体, 领主实体 } from '@/core/entities';
+import type { 冠军实体, 可袭击地点实体, 母畜实体, 领主实体 } from '@/core/entities';
 import type { 回合结算摘要 } from '@/types';
 import { defineStore } from 'pinia';
 import { computed, reactive, ref, shallowRef } from 'vue';
@@ -172,6 +172,16 @@ export const useGameStore = defineStore('game', () => {
     );
   });
 
+  // ─── 行动力 ───
+  const 最大行动力 = computed(() => {
+    检查状态更新();
+    return 游戏实例.value?.任务管理.获取最大行动力() ?? 3;
+  });
+  const 当前行动力 = computed(() => {
+    检查状态更新();
+    return 游戏实例.value?.任务管理.获取剩余行动力() ?? 3;
+  });
+
   // ─── 选中实体 ───
   const 选中的冠军 = computed(() => {
     检查状态更新();
@@ -236,7 +246,9 @@ export const useGameStore = defineStore('game', () => {
 
     switch (目标类型) {
       case '冠军实体':
-        所有冠军.value.forEach(c => {
+        所有冠军.value
+        .filter(m => m.实体ID !== 执行人ID && !游戏实例.value?.任务管理.是否被占用(m.实体ID))
+        .forEach(c => {
           结果.push({
             id: c.实体ID,
             名称: c.获取属性('姓名'),
@@ -247,7 +259,7 @@ export const useGameStore = defineStore('game', () => {
 
       case '母畜实体':
         所有母畜.value
-          .filter(m => m.实体ID !== 执行人ID)
+          .filter(m => m.实体ID !== 执行人ID && !游戏实例.value?.任务管理.是否被占用(m.实体ID))
           .forEach(m => {
             结果.push({
               id: m.实体ID,
@@ -440,8 +452,6 @@ export const useGameStore = defineStore('game', () => {
 
     const 结果 = 游戏实例.value.任务管理.发布任务(任务名, 执行人 as any, 目标 as any);
 
-    console.log('发布任务结果:', 执行人ID, 任务名, 目标ID);
-
     if (结果.成功) {
       添加通知('success', `任务「${任务名}」已发布`);
     } else {
@@ -534,6 +544,8 @@ export const useGameStore = defineStore('game', () => {
     const 结果 = 游戏实例.value.战斗管理.确认战斗();
     if (结果.成功) {
       添加通知('info', '战斗已确认，将在回合结算时执行');
+    } else {
+      添加通知('error', `战斗确认失败: ${结果.原因}`);
     }
     return 结果;
   }
@@ -578,17 +590,23 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function 获取姓名(id: string): string {
+    检查状态更新();
     const 游戏实体 = 游戏实例.value?.实体管理.获取实体(id);
+    console.log(游戏实体);
+    
     switch (游戏实体?.实体类型) {
-      case '冠军实体':
+      case '冠军':
         const 冠军 = 游戏实体 as 冠军实体;
         return 冠军.获取属性('姓名');
-      case '母畜实体':
+      case '母畜':
         const 母畜 = 游戏实体 as 母畜实体;
         return 母畜.获取属性('姓名');
-      case '领主实体':
+      case '领主':
         const 领主 = 游戏实体 as 领主实体;
         return 领主.获取属性('姓名');
+      case '可袭击地点':
+        const 地点 = 游戏实体 as 可袭击地点实体;
+        return 地点.地点名称;
       default:
         return '未知';
     }
@@ -727,6 +745,8 @@ export const useGameStore = defineStore('game', () => {
     预选任务名,
     预选执行人ID,
     预选目标ID,
+    最大行动力,
+    当前行动力,
 
     // 计算属性
     领主,

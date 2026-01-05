@@ -44,6 +44,7 @@ const 可用任务列表 = computed(() => {
 
 // 是否忙碌
 const 是否忙碌 = computed(() => {
+  store.检查状态更新();
   if (!冠军.value) return false;
   return store.检查实体是否有任务(冠军.value.实体ID);
 });

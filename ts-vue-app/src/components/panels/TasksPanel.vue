@@ -160,10 +160,10 @@ function 重置选择() {
             @click="选中任务 = task.名称"
           >
             <span class="task-option__name">{{ task.名称 }}</span>
-            <span v-if="task.配置?.目标实体类型 === '可袭击地点实体-母畜实体'" class="task-option__tag task-option__tag--double">
+            <!-- <span v-if="task.配置?.目标实体类型 === '可袭击地点实体-母畜实体'" class="task-option__tag task-option__tag--double">
               双层目标
             </span>
-            <span v-else-if="task.配置?.目标实体类型" class="task-option__tag">需目标</span>
+            <span v-else-if="task.配置?.目标实体类型" class="task-option__tag">需目标</span> -->
           </button>
         </div>
       </div>
@@ -212,7 +212,7 @@ function 重置选择() {
       <button class="btn btn--primary publish-btn" :disabled="!可以继续" @click="处理发布">
         <span v-if="!选中任务">请选择任务</span>
         <span v-else-if="!选中执行人">请选择执行人</span>
-        <span v-else-if="需要目标">选择目标 →</span>
+        <span v-else-if="需要目标">选择目标</span>
         <span v-else>发布任务</span>
       </button>
     </section>
@@ -228,7 +228,7 @@ function 重置选择() {
           <div class="task-queue-item__info">
             <span class="task-name">{{ task.任务名 }}</span>
             <span class="task-meta">
-              执行人: {{ store.获取姓名(task.执行人ID) || '未知' }}
+              执行人: {{ store.获取姓名(task.执行人ID) || '未1知' }}
               <template v-if="task.目标ID"> → 目标: {{ store.获取姓名(task.目标ID) }} </template>
             </span>
             <span class="task-ap">行动力: {{ task.行动力占用 }}</span>

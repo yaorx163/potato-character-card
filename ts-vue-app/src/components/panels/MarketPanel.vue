@@ -1,17 +1,18 @@
 <!-- components/panels/MarketPanel.vue -->
-<!-- 介绍：黑市面板 - 改进版，支持购买时选择目标 -->
+<!-- 介绍：黑市面板 - 支持购买数量选择和目标选择 -->
 <script setup lang="ts">
 import { useGameStore } from '@/stores/gameStore';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const store = useGameStore();
 
 type MarketTab = 'goods' | 'slaves';
 const activeTab = ref<MarketTab>('goods');
 
-// 目标选择状态
-const selectingTargetFor = ref<string | null>(null); // 商品名或奴隶ID
+// 购买状态
+const selectingTargetFor = ref<string | null>(null);
 const selectedTarget = ref<string | null>(null);
+const purchaseQuantity = ref<number>(1);
 
 const marketManager = computed(() => store.游戏实例?.系统管理.获取黑市管理器());
 
@@ -21,6 +22,7 @@ interface GoodsConfig {
   需要目标?: boolean;
   目标类型?: string[];
   每回合限购?: number;
+  每周限购?: number;
 }
 
 const allGoods = computed(
@@ -31,7 +33,8 @@ const allGoods = computed(
         name,
         config,
         remaining: marketManager.value?.获取商品可购买数量(name) ?? 0,
-        needsTarget: config?.需要目标 ?? false,
+        needsTarget: config?.目标类型 ? true : false,
+        maxPurchase: marketManager.value?.获取商品可购买数量(name) ?? 1,
       };
     }) ?? [],
 );
@@ -43,12 +46,32 @@ const slaves = computed(() => {
 
 const currentMilk = computed(() => store.资源状态.催淫母乳);
 
+// 当前选择的商品配置
+const currentGoodsConfig = computed(() => {
+  if (!selectingTargetFor.value) return null;
+  return allGoods.value.find(g => g.name === selectingTargetFor.value);
+});
+
+// 当前商品总价
+const currentTotalCost = computed(() => {
+  if (!currentGoodsConfig.value) return 0;
+  return (currentGoodsConfig.value.config?.价格 ?? 0) * purchaseQuantity.value;
+});
+
+// 当前可购买最大数量
+const currentMaxQuantity = computed(() => {
+  if (!currentGoodsConfig.value) return 1;
+  const price = currentGoodsConfig.value.config?.价格 ?? 0;
+  const affordableQty = price > 0 ? Math.floor(currentMilk.value / price) : Infinity;
+  const remaining = currentGoodsConfig.value.remaining;
+  return Math.max(1, Math.min(affordableQty, remaining === Infinity ? 99 : remaining));
+});
+
 // 获取可选目标列表
 const availableTargets = computed(() => {
   if (!selectingTargetFor.value) return [];
 
-  // 尝试获取商品配置
-  const goods = allGoods.value.find(g => g.name === selectingTargetFor.value);
+  const goods = currentGoodsConfig.value;
   const targetTypes = goods?.config?.目标类型 ?? ['母畜实体', '冠军实体'];
 
   const result: { id: string; name: string; type: string; info?: string }[] = [];
@@ -74,7 +97,7 @@ const availableTargets = computed(() => {
     });
   }
 
-  if (targetTypes.includes('地点实体')) {
+  if (targetTypes.includes('地点实体') || targetTypes.includes('可袭击地点实体')) {
     store.所有地点.forEach(l => {
       result.push({
         id: l.实体ID,
@@ -87,32 +110,55 @@ const availableTargets = computed(() => {
   return result;
 });
 
-// 检查商品是否需要目标
-function checkAndBuyGoods(goodsName: string) {
+// 重置数量当商品变化时
+watch(selectingTargetFor, () => {
+  purchaseQuantity.value = 1;
+  selectedTarget.value = null;
+});
+
+// 开始购买流程
+function startPurchase(goodsName: string) {
   const goods = allGoods.value.find(g => g.name === goodsName);
-  if (goods?.needsTarget) {
-    selectingTargetFor.value = goodsName;
-    selectedTarget.value = null;
-  } else {
-    store.购买商品(goodsName, 1);
-  }
+  if (!goods) return;
+
+  selectingTargetFor.value = goodsName;
+  purchaseQuantity.value = 1;
+  selectedTarget.value = null;
 }
 
-// 确认购买（带目标）
+// 调整数量
+function adjustQuantity(delta: number) {
+  const newValue = purchaseQuantity.value + delta;
+  purchaseQuantity.value = Math.max(1, Math.min(currentMaxQuantity.value, newValue));
+}
+
+// 设置最大数量
+function setMaxQuantity() {
+  purchaseQuantity.value = currentMaxQuantity.value;
+}
+
+// 确认购买
 function confirmPurchase() {
   if (!selectingTargetFor.value) return;
 
-  // gameStore方法：购买商品并指定目标
-  store.购买商品(selectingTargetFor.value, 1, selectedTarget.value ?? undefined);
+  const goods = currentGoodsConfig.value;
+  if (!goods) return;
 
-  selectingTargetFor.value = null;
-  selectedTarget.value = null;
+  // 检查资源
+  if (currentMilk.value < currentTotalCost.value) return;
+
+  // 需要目标但未选择
+  if (goods.needsTarget && !selectedTarget.value) return;
+
+  store.购买商品(selectingTargetFor.value, purchaseQuantity.value, selectedTarget.value ?? undefined);
+  cancelSelection();
 }
 
 // 取消选择
 function cancelSelection() {
   selectingTargetFor.value = null;
   selectedTarget.value = null;
+  purchaseQuantity.value = 1;
 }
 
 function buySlave(slaveId: string) {
@@ -124,39 +170,88 @@ function buySlave(slaveId: string) {
   <div class="market-panel">
     <!-- 当前资源 -->
     <div class="resource-display">
-      <span class="resource-icon">✦</span>
+      <span class="resource-icon">⚪</span>
       <span class="resource-label">催淫母乳:</span>
       <span class="resource-value">{{ currentMilk }}</span>
     </div>
 
-    <!-- 目标选择弹层 -->
-    <div v-if="selectingTargetFor" class="target-selection-overlay">
-      <div class="target-selection-modal">
+    <!-- 购买弹层 -->
+    <div v-if="selectingTargetFor" class="purchase-modal-overlay">
+      <div class="purchase-modal">
         <div class="modal-header">
-          <h4>选择使用目标</h4>
-          <span class="modal-subtitle">{{ selectingTargetFor }}</span>
+          <h4>{{ selectingTargetFor }}</h4>
+          <span class="modal-subtitle">{{ currentGoodsConfig?.config?.描述 }}</span>
         </div>
 
-        <div class="target-list">
-          <button
-            v-for="target in availableTargets"
-            :key="target.id"
-            class="target-option"
-            :class="{ 'target-option--selected': selectedTarget === target.id }"
-            @click="selectedTarget = target.id"
-          >
-            <div class="target-main">
-              <span class="target-type">[{{ target.type }}]</span>
-              <span class="target-name">{{ target.name }}</span>
-            </div>
-            <span v-if="target.info" class="target-info">{{ target.info }}</span>
-          </button>
-          <div v-if="availableTargets.length === 0" class="no-target">无可用目标</div>
+        <!-- 数量选择 -->
+        <div class="quantity-section">
+          <div class="quantity-label">购买数量</div>
+          <div class="quantity-controls">
+            <button
+              class="quantity-btn"
+              @click="adjustQuantity(-1)"
+              :disabled="purchaseQuantity <= 1"
+            >－</button>
+            <input
+              type="number"
+              class="quantity-input"
+              v-model.number="purchaseQuantity"
+              :min="1"
+              :max="currentMaxQuantity"
+            />
+            <button
+              class="quantity-btn"
+              @click="adjustQuantity(1)"
+              :disabled="purchaseQuantity >= currentMaxQuantity"
+            >＋</button>
+            <button
+              class="quantity-btn quantity-btn--max"
+              @click="setMaxQuantity"
+              :disabled="purchaseQuantity >= currentMaxQuantity"
+            >MAX</button>
+          </div>
+          <div class="quantity-info">
+            <span>单价: ⚪{{ currentGoodsConfig?.config?.价格 }}</span>
+            <span>可购: {{ currentGoodsConfig?.remaining === Infinity ? '∞' : currentGoodsConfig?.remaining }}</span>
+          </div>
+          <div class="quantity-total">
+            总计: <span :class="{ 'cost-exceeded': currentMilk < currentTotalCost }">
+              ⚪ {{ currentTotalCost }}
+            </span>
+          </div>
         </div>
 
+        <!-- 目标选择 -->
+        <div v-if="currentGoodsConfig?.needsTarget" class="target-section">
+          <div class="target-label">选择使用目标</div>
+          <div class="target-list">
+            <button
+              v-for="target in availableTargets"
+              :key="target.id"
+              class="target-option"
+              :class="{ 'target-option--selected': selectedTarget === target.id }"
+              @click="selectedTarget = target.id"
+            >
+              <div class="target-main">
+                <span class="target-type">[{{ target.type }}]</span>
+                <span class="target-name">{{ target.name }}</span>
+              </div>
+              <span v-if="target.info" class="target-info">{{ target.info }}</span>
+            </button>
+            <div v-if="availableTargets.length === 0" class="no-target">无可用目标</div>
+          </div>
+        </div>
+
+        <!-- 操作按钮 -->
         <div class="modal-actions">
           <button class="btn" @click="cancelSelection">取消</button>
-          <button class="btn btn--primary" @click="confirmPurchase" :disabled="!selectedTarget">确认购买</button>
+          <button
+            class="btn btn--primary"
+            @click="confirmPurchase"
+            :disabled="currentMilk < currentTotalCost || (currentGoodsConfig?.needsTarget && !selectedTarget)"
+          >
+            购买 (⚪{{ currentTotalCost }})
+          </button>
         </div>
       </div>
     </div>
@@ -191,9 +286,9 @@ function buySlave(slaveId: string) {
         <button
           class="btn btn--small"
           :disabled="currentMilk < (goods.config?.价格 ?? 0) || goods.remaining <= 0"
-          @click="checkAndBuyGoods(goods.name)"
+          @click="startPurchase(goods.name)"
         >
-          {{ goods.needsTarget ? '选择目标' : '购买' }}
+          购买
         </button>
       </div>
     </div>
@@ -214,7 +309,7 @@ function buySlave(slaveId: string) {
           </span>
         </div>
         <div class="slave-item__action">
-          <span class="slave-price">✦ {{ slave.价格 }}</span>
+          <span class="slave-price">⚪ {{ slave.价格 }}</span>
           <button
             class="btn btn--small btn--primary"
             :disabled="currentMilk < slave.价格"
@@ -260,11 +355,11 @@ function buySlave(slaveId: string) {
   }
 }
 
-/* 目标选择弹层 */
-.target-selection-overlay {
+/* 购买弹层 */
+.purchase-modal-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.75);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -272,9 +367,9 @@ function buySlave(slaveId: string) {
   border-radius: 3px;
 }
 
-.target-selection-modal {
+.purchase-modal {
   width: 90%;
-  max-width: 300px;
+  max-width: 320px;
   background: var(--bg-primary);
   border: 1px solid var(--border-light);
   border-radius: 4px;
@@ -299,9 +394,113 @@ function buySlave(slaveId: string) {
   }
 }
 
+/* 数量选择 */
+.quantity-section {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-dark);
+  background: var(--bg-secondary);
+}
+
+.quantity-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
+.quantity-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.quantity-btn {
+  width: 32px;
+  height: 28px;
+  border-radius: 3px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover:not(:disabled) {
+    background: var(--bg-hover);
+    border-color: var(--accent-corrupt);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  &--max {
+    width: auto;
+    padding: 0 8px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+}
+
+.quantity-input {
+  width: 50px;
+  height: 28px;
+  text-align: center;
+  border: 1px solid var(--border-light);
+  border-radius: 3px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-weight: 600;
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent-corrupt);
+  }
+
+  /* 隐藏数字输入的箭头 */
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  -moz-appearance: textfield;
+}
+
+.quantity-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 6px;
+}
+
+.quantity-total {
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 6px;
+  font-weight: 500;
+
+  .cost-exceeded {
+    color: var(--accent-danger, #ef4444);
+  }
+}
+
+/* 目标选择 */
+.target-section {
+  padding: 10px 12px;
+}
+
+.target-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+
 .target-list {
-  padding: 10px;
-  max-height: 200px;
+  max-height: 160px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -369,6 +568,7 @@ function buySlave(slaveId: string) {
   border-top: 1px solid var(--border-dark);
 }
 
+/* 标签和列表样式保持不变 */
 .market-tabs {
   display: flex;
   gap: 4px;

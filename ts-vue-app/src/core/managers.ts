@@ -80,7 +80,8 @@ class 任务管理器 {
     return this.被占用目标.has(目标ID);
   }
 
-  是否被占用(ID: string): boolean { 
+  是否被占用(ID: string): boolean {
+    if (this.游戏总控?.实体管理.获取实体(ID)?.实体类型 === '可袭击地点') return false
     return this.被占用执行人.has(ID) || this.被占用目标.has(ID);
   }
 
@@ -128,12 +129,12 @@ class 任务管理器 {
     }
 
     // 检查执行人占用
-    if (this.被占用执行人.has(执行人.实体ID)) {
+    if (this.是否被占用(执行人.实体ID)) {
       return { 成功: false, 原因: '执行人已被占用' };
     }
 
     // 检查目标占用
-    if (目标 && this.被占用目标.has(目标.实体ID)) {
+    if (目标 && this.是否被占用(目标.实体ID)) {
       return { 成功: false, 原因: '目标已被占用' };
     }
 
@@ -299,15 +300,47 @@ class 任务管理器 {
       });
     }
 
-    // 清空所有任务和占用
-    this.已发布任务列表.clear();
-    this.被占用执行人.clear();
-    this.被占用目标.clear();
+  // 清空行动力占用大于0的任务和占用状态，保留行动力占用为0的任务
+  const 任务IDsToRemove: string[] = [];
+  for (const [任务ID, 任务] of this.已发布任务列表.entries()) {
+    if (任务.行动力占用 > 0) {
+      任务IDsToRemove.push(任务ID);
+    }
+  }
+
+  // 移除行动力占用大于0的任务
+  for (const 任务ID of 任务IDsToRemove) {
+    const 任务 = this.已发布任务列表.get(任务ID)!;
+    this.已发布任务列表.delete(任务ID);
+    this.被占用执行人.delete(任务.执行人ID);
+    if (任务.目标ID) {
+      this.被占用目标.delete(任务.目标ID);
+    }
+  }
 
     return 结果列表;
   }
 
   // ─── 查询 ───
+
+  获取总行动力(): number {
+    return 3
+  }
+
+  获取行动力占用(): number {
+    return Math.max(
+      Array.from(this.已发布任务列表.values()).reduce(
+        (总和, 任务) => 总和 + 任务.行动力占用,
+        0
+      ),
+      0
+    );
+  }
+
+  获取剩余行动力(): number {
+    return Math.max(this.获取总行动力() - this.获取行动力占用(), 0);
+  }
+
 
   获取已发布任务列表(): 已发布任务[] {
     return Array.from(this.已发布任务列表.values());
@@ -696,7 +729,7 @@ class 实体管理器 {
   }
 
   快速填充到上限(将领输入: 冠军实体 | string): 快速填充结果 {
-    const 将领 =  typeof 将领输入 === 'string' ? this.获取冠军(将领输入) : 将领输入;
+    const 将领 = typeof 将领输入 === 'string' ? this.获取冠军(将领输入) : 将领输入;
     if (!将领) {
       return { 成功: false, 原因: '没有找到该将领', 填充数量: 0, 当前战斗力: 0, 填充详情: [] };
     }
@@ -722,7 +755,7 @@ class 实体管理器 {
 
     const 填充详情: Array<{ 等级: string; 数量: number }> = [];
     let 总填充 = 0;
-    
+
     // 按战斗力优先级填充
     for (const 武装等级 of this.武装优先级) {
       if (剩余容量 <= 0) break;
@@ -789,7 +822,7 @@ class 实体管理器 {
    * 清空将领喽啰池，全部归还公共池
    */
   清空将领喽啰池(将领输入: 冠军实体 | string): 分配结果 {
-    const 将领 =  typeof 将领输入 === 'string' ? this.获取冠军(将领输入) : 将领输入;
+    const 将领 = typeof 将领输入 === 'string' ? this.获取冠军(将领输入) : 将领输入;
     if (!将领) {
       return { 成功: false, 原因: '没有找到该将领', 实际分配: 0, 分配详情: [] };
     }
@@ -848,11 +881,11 @@ class 实体管理器 {
     for (const 地点 of this.地点表.values()) {
       const 已侦查母畜 = 地点.获取已侦查母畜();
       const 潜在母畜 = 地点.获取潜在母畜();
-      
+
       if (已侦查母畜.has(实体ID)) {
         return 已侦查母畜.get(实体ID)!;
       }
-      
+
       if (潜在母畜.has(实体ID)) {
         return 潜在母畜.get(实体ID)!;
       }
@@ -1109,10 +1142,24 @@ class 战斗管理器 {
     }
 
     const 敌方战斗力估值 = this.选定目标.获取战斗力估值();
-    if (敌方战斗力估值 === null) {
-      return { 可执行: false, 原因: '目标地点未侦查' };
-    }
     const 我方战斗力 = this.计算总战斗力();
+    if (敌方战斗力估值 === null) {
+      return {
+        可执行: true,
+        目标: {
+          名称: this.选定目标.地点名称,
+          战斗力: NaN,
+        },
+        我方: {
+          总战斗力: 我方战斗力,
+          将领数量: this.当前部署.size,
+          行动力消耗: this.计算行动力消耗(),
+          突袭模式: this.突袭模式,
+        },
+        胜率预估: NaN,
+      };;
+    }
+
 
     // 简单胜率计算
     const 胜率 = this.计算胜率(我方战斗力, 敌方战斗力估值, this.选定目标);

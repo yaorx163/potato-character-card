@@ -160,7 +160,7 @@ function clearAll() {
     <section class="panel-section hint-section">
       <div class="hint-row">
         <span class="hint-icon">💡</span>
-        <span class="hint-text">喽啰可通过袭击村庄、黑市购买或母畜繁殖获取</span>
+        <span class="hint-text">喽啰可通过母畜繁殖获取</span>
       </div>
     </section>
   </div>

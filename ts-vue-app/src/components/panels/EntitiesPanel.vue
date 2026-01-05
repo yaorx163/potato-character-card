@@ -14,8 +14,11 @@ const props = defineProps<{
   activeEntities: EntityTab
 }>()
 
-const activeEntityTab = ref<EntityTab>(props.activeEntities)
+const emit = defineEmits<{
+  'update:active': [value: string]
+}>()
 
+const activeEntityTab = ref<EntityTab>(props.activeEntities)
 
 const tabs = computed(() => [
   { id: 'champions' as const, label: '冠军', count: store.所有冠军.length },

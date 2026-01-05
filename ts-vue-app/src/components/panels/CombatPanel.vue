@@ -28,6 +28,24 @@ const availableChampions = computed(() => {
   return combatManager.value.获取可出战将领(store.所有冠军)
 })
 
+// 计算可用将领的战斗力预估
+function getChampionCombatPower(championId: string): number {
+  const champion = store.所有冠军.find(c => c.实体ID === championId)
+  if (!champion) return 0
+  // 假设冠军有获取战斗力的方法，或者从战斗管理器获取
+  return champion.管理喽啰池!.获取战斗力()
+}
+
+// 是否可以确认战斗（有目标且有部署将领即可）
+const canConfirmBattle = computed(() => {
+  return selectedTarget.value && deployedChampions.value.length > 0
+})
+
+// 我方总战斗力
+const totalAllyPower = computed(() => {
+  return deployedChampions.value.reduce((sum, d) => sum + d.战斗力, 0)
+})
+
 function selectTarget(locationId: string) {
   store.更新冠军列表()
   store.选择战斗目标(locationId)
@@ -92,6 +110,7 @@ function confirmBattle() {
             @click="deployChampion(champion.实体ID)"
           >
             {{ champion.获取属性('姓名') }}
+            <span class="chip-power chip-power--preview">⚔{{ Math.round(getChampionCombatPower(champion.实体ID)) }}</span>
             <span class="chip-add">+</span>
           </button>
           <span v-if="availableChampions.length === 0" class="no-data">
@@ -118,24 +137,34 @@ function confirmBattle() {
       </div>
     </section>
 
-    <!-- 战斗预览 -->
-    <section v-if="preview?.可执行" class="panel-section preview-section">
+    <!-- 战斗预览 - 即使未侦察也显示 -->
+    <section v-if="canConfirmBattle" class="panel-section preview-section">
       <h3 class="section-title">战斗预览</h3>
 
       <div class="preview-stats">
         <div class="preview-row">
           <span>我方战斗力</span>
-          <span class="text-accent">{{ Math.round(preview.我方!.总战斗力) }}</span>
+          <span class="text-accent">{{ Math.round(totalAllyPower) }}</span>
         </div>
         <div class="preview-row">
           <span>敌方战斗力</span>
-          <span>{{ Math.round(preview.目标!.战斗力) }}</span>
+          <template v-if="selectedTarget?.获取战斗力估值()">
+            <span>{{ Math.round(selectedTarget.获取战斗力估值()!) }}</span>
+          </template>
+          <template v-else>
+            <span class="text-dim">未侦察</span>
+          </template>
         </div>
         <div class="preview-row">
           <span>预估胜率</span>
-          <span :class="preview.胜率预估! >= 0.5 ? 'text-success' : 'text-danger'">
-            {{ Math.round(preview.胜率预估! * 100) }}%
-          </span>
+          <template v-if="preview?.胜率预估 !== undefined">
+            <span :class="preview.胜率预估 >= 0.5 ? 'text-success' : 'text-danger'">
+              {{ Math.round(preview.胜率预估 * 100) }}%
+            </span>
+          </template>
+          <template v-else>
+            <span class="text-dim">未知</span>
+          </template>
         </div>
       </div>
 
@@ -145,6 +174,10 @@ function confirmBattle() {
       >
         确认出战
       </button>
+
+      <p v-if="!selectedTarget?.获取战斗力估值()" class="warning-text">
+        ⚠ 未侦察敌情，战斗风险未知
+      </p>
     </section>
   </div>
 </template>
@@ -285,6 +318,10 @@ function confirmBattle() {
 .chip-power {
   font-size: 18px;
   color: var(--accent-gold);
+
+  &--preview {
+    color: var(--text-dim);
+  }
 }
 
 .no-data {
@@ -312,8 +349,16 @@ function confirmBattle() {
 .text-accent { color: var(--accent-gold); }
 .text-success { color: var(--success); }
 .text-danger { color: var(--danger); }
+.text-dim { color: var(--text-dim); font-style: italic; }
 
 .confirm-btn {
   width: 100%;
+}
+
+.warning-text {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--warning, #f0ad4e);
+  text-align: center;
 }
 </style>
