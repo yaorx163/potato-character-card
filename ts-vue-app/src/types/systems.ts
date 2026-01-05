@@ -32,9 +32,15 @@ export interface 任务配置 {
     描述: string;
     目标实体类型: '母畜实体' | '可袭击地点实体' | '领主实体' | '冠军实体' | '可袭击地点实体-母畜实体' | null;
     执行人实体类型: '冠军实体' | '母畜实体' | '领主实体';
-    前置条件?: 任务前置条件[];
+    前置条件: {
+        类型?: 任务前置条件;
+        臣服度?: 任务前置条件;
+        淫乱度?: 任务前置条件;
+        生育力?: 任务前置条件;
+    };
     行动力占用?: 行动力占用计算;
     执行效果: 任务执行效果;
+    信息?: string;
 }
 
 export interface 任务系统接口 {
@@ -50,6 +56,7 @@ export interface 任务执行结果 {
     已侦察母畜?: 母畜实体[];
     已获取母畜?: 母畜实体[];
     已获取冠军?: 冠军实体[];
+    信息?: string;
     原因?: string;
 }
 
@@ -80,6 +87,7 @@ export interface 法术配置 {
     目标类型: '冠军实体' | '母畜实体' | '可袭击地点实体' | '领主实体' | '喽啰池实体' | null;
     描述: string;
     法术倍率上限: number;
+    信息?: string;
     执行效果: 法术执行效果;
 }
 
@@ -101,6 +109,7 @@ export interface 法术使用记录 {
     倍率: number;
     消耗魔力: number;
     目标ID: string | null;
+    信息?: string;
 }
 
 // ─── 黑市系统 ───
@@ -122,6 +131,7 @@ export interface 商品配置 {
     类型: '消耗品' | '装备' | '道具' | '材料';
     描述: string;
     每周限购: number;
+    信息?: string;
     执行效果: 商品执行效果;
 }
 
@@ -141,6 +151,14 @@ export interface 商品实例 {
     商品ID: string;
     配置: 商品配置;
     本周已购买: number;
+}
+
+export interface 商品购买记录 {
+    商品ID: string;
+    目标: 实体类型 | null;
+    数量: number;
+    总价: number;
+    信息?: string;
 }
 
 export interface 奴隶商品 {
@@ -172,9 +190,10 @@ export interface 奴隶购买结果 {
 // ─── 回合系统 ───
 export interface 回合结算摘要 {
     回合数: number;
-    任务结算结果: 任务结算结果[];
-    法术使用记录: 法术使用记录 | null;
-    战斗结果记录: 战斗结果 | null,
+    任务记录: string[];
+    法术记录: string[];
+    商品记录: string[];
+    战斗记录: string[];
 }
 
 // ─── 游戏总控接口 ───
@@ -250,9 +269,7 @@ export interface 游戏总控接口 {
     };
 
     readonly 存档管理: {
-        获取存档管理器: () => 存档管理器;
-        获取存档数据: () => 游戏存档数据 | null;
-        加载存档数据: (存档: 游戏存档数据) => { 成功: boolean; 原因?: string };
+
     };
 }
 

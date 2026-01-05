@@ -562,6 +562,9 @@ export const useGameStore = defineStore('game', () => {
     最新结算摘要.value = 摘要;
     显示回合结算弹窗.value = true;
 
+    console.log(游戏实例.value.存档管理.保存游戏());
+    游戏实例.value.存档管理.加载存档();
+
     添加通知('info', `第 ${摘要.回合数} 回合结束`);
     更新通用状态();
     return 摘要;
@@ -592,7 +595,6 @@ export const useGameStore = defineStore('game', () => {
   function 获取姓名(id: string): string {
     检查状态更新();
     const 游戏实体 = 游戏实例.value?.实体管理.获取实体(id);
-    console.log(游戏实体);
     
     switch (游戏实体?.实体类型) {
       case '冠军':
@@ -715,7 +717,7 @@ export const useGameStore = defineStore('game', () => {
   function 保存游戏() {
     更新通用状态();
     if (!游戏实例.value) return { 成功: false };
-    const 结果 = 游戏实例.value.存档管理.保存游戏(游戏实例.value);
+    const 结果 = 游戏实例.value.存档管理.保存游戏();
     if (结果.成功) {
       添加通知('success', '游戏已保存');
     }

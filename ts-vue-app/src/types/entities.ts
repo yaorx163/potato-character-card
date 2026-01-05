@@ -164,6 +164,7 @@ export interface 可袭击地点属性Schema extends 实体基类属性Schema {
 }
 
 export interface 可袭击地点配置 {
+    实体ID?: string,
     地点名称?: string;
     地点类型?: string;
     描述?: string;

@@ -7,7 +7,7 @@ import { 冠军实体, 可袭击地点实体, 喽啰池实体, 母畜实体, 领
 
 import { 工厂管理器 } from '../core/factories';
 
-import type { 任务配置, 可执行实体, 可目标实体, 奴隶购买结果, 已发布任务, 法术执行结果, 游戏总控接口, 购买结果 } from '../types/systems';
+import type { 任务配置, 可执行实体, 可目标实体, 回合结算摘要, 奴隶购买结果, 已发布任务, 法术执行结果, 游戏总控接口, 购买结果 } from '../types/systems';
 
 import type { 运行时实体配置, 领主创建配置 } from '../types/index';
 
@@ -18,7 +18,6 @@ import { 存档管理器 } from '../core/persistence';
 
 import { 任务管理器, 回合管理器, 实体管理器, 战斗管理器, 法术管理器, 资源管理器, 黑市管理器 } from '../core/managers';
 import type { 游戏初始化配置 } from '@/types/controller';
-import type { n } from 'vite/dist/node/chunks/moduleRunnerTransport';
 
 // ═══════════════════════════════════════════════════════════════
 // 游戏总控
@@ -142,16 +141,16 @@ class 游戏总控 implements 游戏总控接口 {
 
   readonly 回合管理: {
     获取当前回合: () => number;
-    结束回合: () => any;
+    结束回合: () => 回合结算摘要;
     获取游戏状态: () => any;
   };
 
   readonly 存档管理: {
-    保存游戏: (游戏总控: 游戏总控) => {成功: boolean; 原因?: string | undefined;};
+    写入变量: ()=> { 成功: boolean; 原因?: string };
+    读取变量: ()=> { 成功: boolean; 原因?: string };
+    保存游戏: () => {成功: boolean; 原因?: string | undefined;};
     加载存档: () => {成功: boolean; 原因?: string | undefined;};
     获取存档管理器: () => 存档管理器;
-    获取存档数据: () => 游戏存档数据 | null;
-    加载存档数据: (存档: 游戏存档数据) => { 成功: boolean; 原因?: string };
   };
 
   constructor(配置: { 运行时配置: 运行时实体配置; 初始资源?: 游戏初始化配置 }) {
@@ -362,9 +361,10 @@ class 游戏总控 implements 游戏总控接口 {
       结束回合: () => {
         // 资源结算
         this.资源管理器实例.回合结算();
+        const 回合结算摘要 = this.回合管理器实例.结束回合();
 
         // 系统结算
-        return this.回合管理器实例.结束回合();
+        return 回合结算摘要;
       },
       获取游戏状态: () => {
         return {
@@ -377,14 +377,11 @@ class 游戏总控 implements 游戏总控接口 {
     };
 
     this.存档管理 = {
-      保存游戏: (游戏总控: 游戏总控) => this.存档管理器实例.保存游戏(游戏总控,1),
-      加载存档: () => this.存档管理器实例.读取存档(1),
+      写入变量: () => this.存档管理器实例.保存至变量(),
+      读取变量: () => this.存档管理器实例.保存至变量(),
+      保存游戏: () => this.存档管理器实例.保存游戏('默认'),
+      加载存档: () => this.存档管理器实例.加载存档('默认'),
       获取存档管理器: () => this.存档管理器实例,
-      获取存档数据: () => this.存档管理器实例.获取存档数据(this),
-      加载存档数据: (存档: 游戏存档数据) => {
-        const 成功 = this.存档管理器实例.加载存档数据(存档, this);
-        return { 成功 };
-      }
     };
   }
 
@@ -400,6 +397,7 @@ class 游戏总控 implements 游戏总控接口 {
       this.战斗管理器实例,
       this.资源管理器实例,
     );
+    this.存档管理器实例.设置游戏总控(this);
   }
 
   // ─── 游戏状态 ───

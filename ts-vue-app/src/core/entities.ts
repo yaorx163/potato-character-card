@@ -257,7 +257,7 @@ class 母畜实体 extends 实体基类<母畜属性Schema> {
   喽啰生育记录: number;
 
   constructor(配置: 母畜初始数据 = {}) {
-    super('母畜');
+    super('母畜', 配置);
 
     this.设置属性约束('臣服度', 0, 100);
     this.设置属性约束('淫乱度', 0, 100);
@@ -335,9 +335,9 @@ class 母畜实体 extends 实体基类<母畜属性Schema> {
     return 100
   }
   生育喽啰消耗(): number{
-    return 100
+    return 10
   }
-  消耗生育力(生育对象: 冠军实体 | null = null): void {
+  消耗生育力(生育对象: 冠军实体 | number): void {
     if (生育对象){
       this.修改属性('剩余生育力', - this.生育冠军消耗());
     }else {
@@ -431,7 +431,6 @@ class 喽啰池实体 extends 实体基类 {
     分组.数量 -= 实际减少;
 
     this.武装分组.set(武装等级, 分组);
-    console.log(this);
 
     return {
       成功: true,
@@ -507,7 +506,7 @@ class 可袭击地点实体 extends 实体基类<可袭击地点属性Schema> {
   战斗力估值: number | null;
 
   constructor(配置: 可袭击地点配置 = {}) {
-    super('可袭击地点');
+    super('可袭击地点', 配置);
 
     this.地点名称 = 配置.地点名称 || '未知地点';
     this.地点类型 = 配置.地点类型 || '村庄';

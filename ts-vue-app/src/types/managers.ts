@@ -36,6 +36,8 @@ export interface 战斗结果 {
     成功: boolean;
     胜利: boolean;
     原因?: string;
+    目标: string;
+    损失: number;
     我方战斗力: number;
     敌方战斗力: number;
     战损比例?: number;

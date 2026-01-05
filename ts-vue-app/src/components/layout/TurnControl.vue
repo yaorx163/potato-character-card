@@ -17,7 +17,6 @@ const hasCombat = computed(() =>{
 
 function endTurn() {
   store.结束回合()
-  console.log(store.游戏实例)
 }
 </script>
 
